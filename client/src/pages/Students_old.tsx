@@ -1,59 +1,57 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { 
-  UserCheck, 
+  Users, 
   Search, 
   Filter,
   Eye,
   Edit,
   Trash2,
   Download,
-  Upload,
-  Star
+  Upload
 } from "lucide-react";
-import AddTeacherDialog from "@/components/AddTeacherDialog";
+import AddStudentDialog from "@/components/AddStudentDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import type { Teacher } from "@shared/schema";
+import type { Student } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 
-export default function Teachers() {
+export default function Students() {
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
 
-  const { data: teachers, isLoading } = useQuery({
-    queryKey: ["/api/teachers"],
+  const { data: students, isLoading } = useQuery({
+    queryKey: ["/api/students"],
   });
 
-  const deleteTeacherMutation = useMutation({
+  const deleteStudentMutation = useMutation({
     mutationFn: async (id: number) => {
-      await apiRequest("DELETE", `/api/teachers/${id}`);
+      await apiRequest("DELETE", `/api/students/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/teachers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/students"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
       toast({
         title: "Success",
-        description: "Teacher deleted successfully",
+        description: "Student deleted successfully",
       });
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to delete teacher",
+        description: "Failed to delete student",
         variant: "destructive",
       });
     },
   });
 
-  const filteredTeachers = teachers?.filter((teacher: Teacher) =>
-    `${teacher.firstName} ${teacher.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    teacher.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    teacher.specialization?.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredStudents = students?.filter((student: Student) =>
+    `${student.firstName} ${student.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    student.email.toLowerCase().includes(searchTerm.toLowerCase())
   ) || [];
 
   if (isLoading) {
@@ -71,31 +69,31 @@ export default function Teachers() {
     <div className="p-8 space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Teacher Management</h1>
-          <p className="text-slate-600 mt-1">Manage teaching staff, schedules, and performance tracking.</p>
+          <h1 className="text-2xl font-bold text-slate-900">Student Management</h1>
+          <p className="text-slate-600 mt-1">Manage student information, enrollment, and academic records.</p>
         </div>
         <div className="flex items-center space-x-3">
           <Button variant="outline">
             <Upload size={16} className="mr-2" />
-            Import Teachers
+            Import Students
           </Button>
           <Button variant="outline">
             <Download size={16} className="mr-2" />
             Export Data
           </Button>
-          <AddTeacherDialog />
+          <AddStudentDialog />
         </div>
       </div>
 
       <Card className="glass-card rounded-2xl shadow-lg">
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
-            <CardTitle>All Teachers ({filteredTeachers.length})</CardTitle>
+            <CardTitle>All Students ({filteredStudents.length})</CardTitle>
             <div className="flex items-center space-x-4">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={16} />
                 <Input
-                  placeholder="Search teachers..."
+                  placeholder="Search students..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10 w-80"
@@ -109,56 +107,54 @@ export default function Teachers() {
           </div>
         </CardHeader>
         <CardContent>
-          {filteredTeachers.length > 0 ? (
+          {filteredStudents.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200">
-                    <th className="text-left py-3 px-4 font-medium text-slate-600 text-sm">Teacher</th>
+                    <th className="text-left py-3 px-4 font-medium text-slate-600 text-sm">Student</th>
                     <th className="text-left py-3 px-4 font-medium text-slate-600 text-sm">Contact</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-600 text-sm">Qualification</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-600 text-sm">Specialization</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-600 text-sm">Experience</th>
+                    <th className="text-left py-3 px-4 font-medium text-slate-600 text-sm">Parent Info</th>
                     <th className="text-left py-3 px-4 font-medium text-slate-600 text-sm">Status</th>
+                    <th className="text-left py-3 px-4 font-medium text-slate-600 text-sm">Enrollment Date</th>
                     <th className="text-left py-3 px-4 font-medium text-slate-600 text-sm">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {filteredTeachers.map((teacher: Teacher) => (
-                    <tr key={teacher.id} className="hover:bg-gray-50 transition-colors">
+                  {filteredStudents.map((student: Student) => (
+                    <tr key={student.id} className="hover:bg-gray-50 transition-colors">
                       <td className="py-4 px-4">
                         <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-teal-600 rounded-full flex items-center justify-center text-white font-medium">
-                            {teacher.firstName?.[0]}{teacher.lastName?.[0]}
+                          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-medium">
+                            {student.firstName?.[0]}{student.lastName?.[0]}
                           </div>
                           <div>
-                            <p className="font-medium text-slate-900">{teacher.firstName} {teacher.lastName}</p>
-                            <p className="text-sm text-slate-500">ID: TCH{teacher.id.toString().padStart(3, '0')}</p>
+                            <p className="font-medium text-slate-900">{student.firstName} {student.lastName}</p>
+                            <p className="text-sm text-slate-500">ID: STU{student.id.toString().padStart(3, '0')}</p>
                           </div>
                         </div>
                       </td>
                       <td className="py-4 px-4">
                         <div>
-                          <p className="text-sm text-slate-900">{teacher.email}</p>
-                          <p className="text-sm text-slate-500">{teacher.phone}</p>
+                          <p className="text-sm text-slate-900">{student.email}</p>
+                          <p className="text-sm text-slate-500">{student.phone}</p>
                         </div>
                       </td>
                       <td className="py-4 px-4">
-                        <p className="text-sm text-slate-900">{teacher.qualification || "Not specified"}</p>
-                      </td>
-                      <td className="py-4 px-4">
-                        <p className="text-sm text-slate-900">{teacher.specialization || "General"}</p>
-                      </td>
-                      <td className="py-4 px-4">
-                        <div className="flex items-center space-x-1">
-                          <Star size={12} className="text-yellow-500" fill="currentColor" />
-                          <span className="text-sm text-slate-900">{teacher.experience || 0} years</span>
+                        <div>
+                          <p className="text-sm text-slate-900">{student.parentName || "Not provided"}</p>
+                          <p className="text-sm text-slate-500">{student.parentPhone || "Not provided"}</p>
                         </div>
                       </td>
                       <td className="py-4 px-4">
-                        <Badge variant={teacher.isActive ? "default" : "secondary"}>
-                          {teacher.isActive ? "Active" : "Inactive"}
+                        <Badge variant={student.isActive ? "default" : "secondary"}>
+                          {student.isActive ? "Active" : "Inactive"}
                         </Badge>
+                      </td>
+                      <td className="py-4 px-4">
+                        <p className="text-sm text-slate-600">
+                          {student.enrollmentDate ? new Date(student.enrollmentDate).toLocaleDateString() : "N/A"}
+                        </p>
                       </td>
                       <td className="py-4 px-4">
                         <div className="flex items-center space-x-2">
@@ -171,8 +167,8 @@ export default function Teachers() {
                           <Button 
                             variant="ghost" 
                             size="sm"
-                            onClick={() => deleteTeacherMutation.mutate(teacher.id)}
-                            disabled={deleteTeacherMutation.isPending}
+                            onClick={() => deleteStudentMutation.mutate(student.id)}
+                            disabled={deleteStudentMutation.isPending}
                           >
                             <Trash2 size={14} />
                           </Button>
@@ -185,13 +181,13 @@ export default function Teachers() {
             </div>
           ) : (
             <div className="text-center py-12">
-              <UserCheck className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No teachers found</h3>
+              <Users className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No students found</h3>
               <p className="text-gray-500 mb-6">
-                {searchTerm ? "Try adjusting your search criteria." : "Get started by adding your first teacher."}
+                {searchTerm ? "Try adjusting your search criteria." : "Get started by adding your first student."}
               </p>
               {!searchTerm && (
-                <AddTeacherDialog />
+                <AddStudentDialog />
               )}
             </div>
           )}
