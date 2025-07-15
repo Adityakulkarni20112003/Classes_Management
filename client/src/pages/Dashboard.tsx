@@ -215,21 +215,7 @@ export default function Dashboard() {
       <Card className="glass-card rounded-2xl shadow-lg">
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-semibold text-slate-900">Students Overview</h3>
-            <div className="flex items-center space-x-3">
-              <div className="relative">
-                <input 
-                  type="text" 
-                  placeholder="Search students..." 
-                  className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-gray-50"
-                />
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={16} />
-              </div>
-              <Button className="bg-primary-600 hover:bg-primary-700 text-white">
-                <UserPlus size={16} className="mr-2" />
-                Add Student
-              </Button>
-            </div>
+            <h3 className="text-xl font-semibold text-slate-900">Recent Students</h3>
           </div>
 
           {students && students.length > 0 ? (
