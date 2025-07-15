@@ -8,6 +8,7 @@ import Dashboard from "@/pages/Dashboard";
 import Students from "@/pages/Students";
 import Teachers from "@/pages/Teachers";
 import Courses from "@/pages/Courses";
+import Batches from "@/pages/Batches";
 import Exams from "@/pages/Exams";
 import Attendance from "@/pages/Attendance";
 import Fees from "@/pages/Fees";
@@ -23,6 +24,7 @@ function Router() {
         <Route path="/students" component={Students} />
         <Route path="/teachers" component={Teachers} />
         <Route path="/courses" component={Courses} />
+        <Route path="/batches" component={Batches} />
         <Route path="/exams" component={Exams} />
         <Route path="/attendance" component={Attendance} />
         <Route path="/fees" component={Fees} />

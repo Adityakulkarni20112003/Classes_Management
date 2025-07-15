@@ -157,6 +157,11 @@ export class MemStorage implements IStorage {
       id,
       enrollmentDate: new Date(),
       isActive: true,
+      address: student.address || null,
+      dateOfBirth: student.dateOfBirth || null,
+      parentName: student.parentName || null,
+      parentPhone: student.parentPhone || null,
+      profilePhoto: student.profilePhoto || null,
     };
     this.students.set(id, newStudent);
     return newStudent;
@@ -191,6 +196,10 @@ export class MemStorage implements IStorage {
       id,
       joinDate: new Date(),
       isActive: true,
+      qualification: teacher.qualification || null,
+      experience: teacher.experience || null,
+      specialization: teacher.specialization || null,
+      salary: teacher.salary || null,
     };
     this.teachers.set(id, newTeacher);
     return newTeacher;
@@ -220,7 +229,14 @@ export class MemStorage implements IStorage {
 
   async createCourse(course: InsertCourse): Promise<Course> {
     const id = this.currentCourseId++;
-    const newCourse: Course = { ...course, id };
+    const newCourse: Course = { 
+      ...course, 
+      id,
+      duration: course.duration || null,
+      description: course.description || null,
+      isActive: course.isActive || null,
+      fee: course.fee || null,
+    };
     this.courses.set(id, newCourse);
     return newCourse;
   }
@@ -249,7 +265,18 @@ export class MemStorage implements IStorage {
 
   async createBatch(batch: InsertBatch): Promise<Batch> {
     const id = this.currentBatchId++;
-    const newBatch: Batch = { ...batch, id, currentEnrollment: 0 };
+    const newBatch: Batch = { 
+      ...batch, 
+      id, 
+      currentEnrollment: 0,
+      isActive: batch.isActive || null,
+      courseId: batch.courseId || null,
+      teacherId: batch.teacherId || null,
+      startDate: batch.startDate || null,
+      endDate: batch.endDate || null,
+      capacity: batch.capacity || null,
+      schedule: batch.schedule || null,
+    };
     this.batches.set(id, newBatch);
     return newBatch;
   }
@@ -287,6 +314,8 @@ export class MemStorage implements IStorage {
       id,
       enrollmentDate: new Date(),
       status: "active",
+      studentId: enrollment.studentId || null,
+      batchId: enrollment.batchId || null,
     };
     this.enrollments.set(id, newEnrollment);
     return newEnrollment;
@@ -311,7 +340,16 @@ export class MemStorage implements IStorage {
 
   async createExam(exam: InsertExam): Promise<Exam> {
     const id = this.currentExamId++;
-    const newExam: Exam = { ...exam, id };
+    const newExam: Exam = { 
+      ...exam, 
+      id,
+      type: exam.type || null,
+      duration: exam.duration || null,
+      batchId: exam.batchId || null,
+      examDate: exam.examDate || null,
+      totalMarks: exam.totalMarks || null,
+      instructions: exam.instructions || null,
+    };
     this.exams.set(id, newExam);
     return newExam;
   }
@@ -344,7 +382,15 @@ export class MemStorage implements IStorage {
 
   async createExamResult(result: InsertExamResult): Promise<ExamResult> {
     const id = this.currentExamResultId++;
-    const newResult: ExamResult = { ...result, id };
+    const newResult: ExamResult = { 
+      ...result, 
+      id,
+      studentId: result.studentId || null,
+      examId: result.examId || null,
+      marksObtained: result.marksObtained || null,
+      grade: result.grade || null,
+      remarks: result.remarks || null,
+    };
     this.examResults.set(id, newResult);
     return newResult;
   }
@@ -379,7 +425,15 @@ export class MemStorage implements IStorage {
 
   async createAttendance(attendance: InsertAttendance): Promise<Attendance> {
     const id = this.currentAttendanceId++;
-    const newAttendance: Attendance = { ...attendance, id };
+    const newAttendance: Attendance = { 
+      ...attendance, 
+      id,
+      status: attendance.status || null,
+      date: attendance.date || null,
+      studentId: attendance.studentId || null,
+      batchId: attendance.batchId || null,
+      remarks: attendance.remarks || null,
+    };
     this.attendance.set(id, newAttendance);
     return newAttendance;
   }
@@ -404,7 +458,18 @@ export class MemStorage implements IStorage {
 
   async createFee(fee: InsertFee): Promise<Fee> {
     const id = this.currentFeeId++;
-    const newFee: Fee = { ...fee, id };
+    const newFee: Fee = { 
+      ...fee, 
+      id,
+      status: fee.status || null,
+      studentId: fee.studentId || null,
+      batchId: fee.batchId || null,
+      amount: fee.amount || null,
+      dueDate: fee.dueDate || null,
+      paidDate: fee.paidDate || null,
+      paymentMethod: fee.paymentMethod || null,
+      receiptNumber: fee.receiptNumber || null,
+    };
     this.fees.set(id, newFee);
     return newFee;
   }
@@ -430,6 +495,12 @@ export class MemStorage implements IStorage {
       id,
       sentAt: new Date(),
       status: "sent",
+      content: message.content || null,
+      type: message.type || null,
+      recipientType: message.recipientType || null,
+      recipientId: message.recipientId || null,
+      subject: message.subject || null,
+      sentBy: message.sentBy || null,
     };
     this.messages.set(id, newMessage);
     return newMessage;
