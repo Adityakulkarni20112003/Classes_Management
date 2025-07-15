@@ -1,0 +1,156 @@
+Build a modern, futuristic frontend UI for a Coaching Classes Management System using React.js and Tailwind CSS.
+
+⚠️ Important Guidelines:
+
+Keep the file structure clean and simple.
+
+DO NOT create separate files for basic elements like buttons, cards, inputs — just define them inline or locally within pages/components where needed.
+
+Only create files for major feature components, like:
+
+Student Management
+
+Teacher Management
+
+Course & Batch Management
+
+Exam/Marks
+
+Attendance
+
+Fees
+
+Messaging System
+
+Dashboard
+
+🎨 Design Requirements:
+
+Use a modern theme with futuristic UI (glassmorphism/neumorphism or subtle gradients).
+
+Responsive design for desktop, tablet, and mobile.
+
+Use Tailwind CSS for styling (soft shadows, animated transitions, modern fonts).
+
+Include Framer Motion for component transitions (fade in/out, slide).
+
+Use clean dashboard-style layout with sidebar navigation and summary cards.
+
+📚 Included Modules (with basic mock data):
+
+Dashboard Page
+
+Summary cards: total students, teachers, fees collected, absentees.
+
+Line chart for performance analytics.
+
+Student Management
+
+View/Add/Edit/Delete students.
+
+Filter/search by batch/performance.
+
+Upload photo/documents.
+
+Show ID card view.
+
+Teacher Management
+
+View/Add/Edit/Delete teachers.
+
+Assign to batches/subjects.
+
+Availability schedule UI.
+
+Course & Batch Management
+
+Create courses and define batches.
+
+Assign teachers & subjects.
+
+Exam/Marks
+
+Add/view test results.
+
+Grade analyzer with visual bar.
+
+Downloadable PDF progress report (mock only).
+
+Attendance
+
+Mark attendance per batch.
+
+Show reports and summary.
+
+Auto message to parent if student is absent.
+
+Fee Management
+
+Fee tracking table.
+
+Apply discounts.
+
+Generate receipts (mock).
+
+Parent Messaging System
+
+Send messages for:
+
+Absentee
+
+Pending Fees
+
+Test Results
+
+Editable templates
+
+Message logs
+
+📁 Recommended Simple File Structure
+bash
+Copy
+Edit
+/coaching-app
+│
+├── public/
+│   └── logo, favicon, etc.
+│
+├── src/
+│   ├── assets/
+│   │   └── images/, icons/
+│
+│   ├── components/
+│   │   └── shared layout components like:
+│   │       └── Sidebar.jsx
+│   │       └── Header.jsx
+│   │       └── DashboardCards.jsx
+│
+│   ├── pages/
+│   │   └── Dashboard.jsx
+│   │   └── Students.jsx
+│   │   └── Teachers.jsx
+│   │   └── Batches.jsx
+│   │   └── Exams.jsx
+│   │   └── Attendance.jsx
+│   │   └── Fees.jsx
+│   │   └── Messaging.jsx
+│
+│   ├── utils/
+│   │   └── dummyData.js
+│   │   └── helpers.js
+│
+│   ├── App.jsx
+│   ├── main.jsx or index.js
+│
+├── tailwind.config.js
+├── package.json
+└── README.md
+✅ Final Tips for AI Code Generator:
+Ask the AI to only make major components per page/module.
+
+Use static/dummy data for now.
+
+Apply Tailwind classes directly inside JSX.
+
+Avoid creating Button.jsx, Input.jsx, etc. unless absolutely necessary.
+
