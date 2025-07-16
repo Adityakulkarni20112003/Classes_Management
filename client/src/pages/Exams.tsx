@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { 
   FileText, 
   Search, 
@@ -30,7 +30,7 @@ import { insertExamSchema, insertExamResultSchema } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Exam, ExamResult, Student, Batch, Course } from "@shared/schema";
+import type { Exam, ExamResult, Student, Batch, Course, Enrollment } from "@shared/schema";
 import { z } from "zod";
 
 const examFormSchema = insertExamSchema.extend({
@@ -43,7 +43,10 @@ const examFormSchema = insertExamSchema.extend({
 const resultFormSchema = insertExamResultSchema.extend({
   examId: z.number().min(1, "Exam is required").optional().or(z.literal(undefined)),
   batchId: z.number().min(1, "Batch is required"),
-  marksObtained: z.number().min(0, "Marks obtained is required"),
+  // Made these fields optional since they've been removed from the UI
+  marksObtained: z.number().min(0).optional(),
+  grade: z.string().optional(),
+  remarks: z.string().optional(),
 });
 
 export default function Exams() {
@@ -54,7 +57,10 @@ export default function Exams() {
   const [isResultDialogOpen, setIsResultDialogOpen] = useState(false);
   const [newExamTitle, setNewExamTitle] = useState("");
   const [showNewExamInput, setShowNewExamInput] = useState(false);
+  const [selectedBatchStudents, setSelectedBatchStudents] = useState<Student[]>([]);
+  const [studentMarks, setStudentMarks] = useState<{[key: number]: number}>({});
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { data: exams, isLoading: examsLoading } = useQuery({
     queryKey: ["/api/exams"],
@@ -68,12 +74,54 @@ export default function Exams() {
     queryKey: ["/api/students"],
   });
 
+  const { data: enrollments, isLoading: enrollmentsLoading } = useQuery({
+    queryKey: ["/api/enrollments"],
+    queryFn: async () => {
+      const response = await fetch("/api/enrollments");
+      if (!response.ok) {
+        throw new Error("Failed to fetch enrollments");
+      }
+      return response.json();
+    },
+  });
+  
+  // Function to get students for a specific batch
+  const getStudentsForBatch = (batchId: number) => {
+    if (!students || !enrollments) return [];
+    
+    // Filter enrollments by batchId and active status
+    const batchEnrollments = enrollments.filter(
+      (enrollment: Enrollment) => enrollment.batchId === batchId && enrollment.status === "active"
+    );
+    
+    // Get student details for each enrollment
+    const batchStudents = batchEnrollments.map((enrollment: Enrollment) => {
+      return students.find((student: Student) => student.id === enrollment.studentId);
+    }).filter(Boolean) as Student[];
+    
+    return batchStudents;
+  };
+
   const { data: batches } = useQuery({
     queryKey: ["/api/batches"],
+    queryFn: async () => {
+      const response = await fetch("/api/batches");
+      if (!response.ok) {
+        throw new Error("Failed to fetch batches");
+      }
+      return response.json();
+    },
   });
 
   const { data: courses } = useQuery({
     queryKey: ["/api/courses"],
+    queryFn: async () => {
+      const response = await fetch("/api/courses");
+      if (!response.ok) {
+        throw new Error("Failed to fetch courses");
+      }
+      return response.json();
+    },
   });
 
   const examForm = useForm<z.infer<typeof examFormSchema>>({
@@ -89,16 +137,38 @@ export default function Exams() {
     },
   });
 
-  const resultForm = useForm<z.infer<typeof resultFormSchema>>({
+  const resultForm = useForm<z.infer<typeof resultFormSchema>>({    
     resolver: zodResolver(resultFormSchema),
     defaultValues: {
       examId: undefined,
       batchId: undefined,
-      marksObtained: 0,
-      grade: "",
-      remarks: "",
+      // Removed default values for fields that have been removed from the UI
+      // marksObtained: 0,
+      // grade: "",
+      // remarks: "",
     },
   });
+  
+  // Watch for batchId changes
+  const selectedBatchId = resultForm.watch('batchId');
+  
+  // Update selectedBatchStudents when batchId changes
+  useEffect(() => {
+    if (selectedBatchId) {
+      const students = getStudentsForBatch(selectedBatchId);
+      setSelectedBatchStudents(students);
+      
+      // Initialize marks for all students to 0
+      const initialMarks: {[key: number]: number} = {};
+      students.forEach((student) => {
+        initialMarks[student.id] = 0;
+      });
+      setStudentMarks(initialMarks);
+    } else {
+      setSelectedBatchStudents([]);
+      setStudentMarks({});
+    }
+  }, [selectedBatchId, students, enrollments, getStudentsForBatch]);
 
   const createExamMutation = useMutation({
     mutationFn: async (data: z.infer<typeof examFormSchema>) => {
@@ -128,6 +198,7 @@ export default function Exams() {
       const response = await apiRequest("POST", "/api/exam-results", data);
       return response.json();
     },
+    // Make it async so we can await it in the batch processing
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/exam-results"] });
       setIsResultDialogOpen(false);
@@ -220,12 +291,38 @@ export default function Exams() {
         queryClient.invalidateQueries({ queryKey: ["/api/exams"] });
       }
       
-      // Create the exam result
-      createResultMutation.mutate(data);
+      // Create exam results for each student in the batch
+      const promises = selectedBatchStudents.map(async (student) => {
+        // Set default values for removed fields
+        const resultData = {
+          ...data,
+          studentId: student.id,
+          marksObtained: studentMarks[student.id] || 0,
+          grade: "N/A", // Default value
+          remarks: "" // Default value
+        };
+        
+        // Create the exam result
+        return createResultMutation.mutateAsync(resultData);
+      });
+      
+      await Promise.all(promises);
+      
+      // Close dialog and show success message
+      setIsResultDialogOpen(false);
+      resultForm.reset();
+      
+      toast({
+        title: "Success",
+        description: `Exam results added for ${selectedBatchStudents.length} students`,
+      });
+      
+      // Refresh results data
+      queryClient.invalidateQueries({ queryKey: ["/api/exam-results"] });
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to create exam or add result",
+        description: "Failed to create exam or add results",
         variant: "destructive",
       });
     }
@@ -279,6 +376,8 @@ export default function Exams() {
     }
   };
 
+  // Function getStudentsForBatch and useEffect for updating students are already defined above
+
   if (examsLoading || resultsLoading) {
     return (
       <div className="p-8">
@@ -322,29 +421,49 @@ export default function Exams() {
                         </FormItem>
                       )}
                     />
-                    <FormField
-                      control={examForm.control}
-                      name="type"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Exam Type</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                    <div className="col-span-2 grid grid-cols-2 gap-6">
+                      <FormField
+                        control={examForm.control}
+                        name="type"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Exam Type</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value || ""}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select type" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="written">Written</SelectItem>
+                                <SelectItem value="oral">Oral</SelectItem>
+                                <SelectItem value="practical">Practical</SelectItem>
+                                <SelectItem value="online">Online</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={examForm.control}
+                        name="totalMarks"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Total Marks</FormLabel>
                             <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select type" />
-                              </SelectTrigger>
+                              <Input 
+                                type="number" 
+                                placeholder="100" 
+                                {...field}
+                                onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                              />
                             </FormControl>
-                            <SelectContent>
-                              <SelectItem value="written">Written</SelectItem>
-                              <SelectItem value="oral">Oral</SelectItem>
-                              <SelectItem value="practical">Practical</SelectItem>
-                              <SelectItem value="online">Online</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                     <FormField
                       control={examForm.control}
                       name="batchId"
@@ -407,24 +526,7 @@ export default function Exams() {
                         </FormItem>
                       )}
                     />
-                    <FormField
-                      control={examForm.control}
-                      name="totalMarks"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Total Marks</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              placeholder="100" 
-                              {...field}
-                              onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+
                   </div>
                   
                   <FormField
@@ -500,40 +602,59 @@ export default function Exams() {
                           {showNewExamInput ? (
                             <div className="space-y-2">
                               <FormControl>
-                                <Textarea 
+                                <Input 
                                   placeholder="Enter new exam title"
                                   value={newExamTitle}
                                   onChange={(e) => setNewExamTitle(e.target.value)}
-                                  className="resize-none"
                                 />
                               </FormControl>
-                              <FormField
-                                control={resultForm.control}
-                                name="batchId"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Batch for New Exam</FormLabel>
-                                    <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
+                              <div className="grid grid-cols-2 gap-4">
+                                <FormField
+                                  control={resultForm.control}
+                                  name="batchId"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Batch</FormLabel>
+                                      <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
+                                        <FormControl>
+                                          <SelectTrigger>
+                                            <SelectValue placeholder="Select batch" />
+                                          </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                          {batches?.map((batch: Batch) => {
+                                            const course = courses?.find((c: Course) => c.id === batch.courseId);
+                                            return (
+                                              <SelectItem key={batch.id} value={batch.id.toString()}>
+                                                {batch.name} - {course?.name}
+                                              </SelectItem>
+                                            );
+                                          })}
+                                        </SelectContent>
+                                      </Select>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={examForm.control}
+                                  name="totalMarks"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Total Marks</FormLabel>
                                       <FormControl>
-                                        <SelectTrigger>
-                                          <SelectValue placeholder="Select batch" />
-                                        </SelectTrigger>
+                                        <Input 
+                                          type="number" 
+                                          placeholder="100" 
+                                          {...field}
+                                          onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                                        />
                                       </FormControl>
-                                      <SelectContent>
-                                        {batches?.map((batch: Batch) => {
-                                          const course = courses?.find((c: Course) => c.id === batch.courseId);
-                                          return (
-                                            <SelectItem key={batch.id} value={batch.id.toString()}>
-                                              {batch.name} - {course?.name}
-                                            </SelectItem>
-                                          );
-                                        })}
-                                      </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </div>
                             </div>
                           ) : (
                             <>
@@ -584,55 +705,61 @@ export default function Exams() {
                         </FormItem>
                       )}
                     />
-                    <FormField
-                      control={resultForm.control}
-                      name="marksObtained"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Marks Obtained</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              placeholder="85" 
-                              {...field}
-                              onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={resultForm.control}
-                      name="grade"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Grade</FormLabel>
-                          <FormControl>
-                            <Input placeholder="A" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    
+                    {/* Student list with editable marks */}
+                    {selectedBatchStudents.length > 0 && (
+                      <div className="col-span-2 mt-6">
+                        <h3 className="text-lg font-medium mb-4">Students in Selected Batch</h3>
+                        <div className="overflow-x-auto">
+                          <table className="w-full border-collapse">
+                            <thead>
+                              <tr className="bg-slate-100 dark:bg-slate-800">
+                                <th className="text-left py-2 px-3 font-medium text-slate-600 dark:text-slate-300 text-sm">Roll No</th>
+                                <th className="text-left py-2 px-3 font-medium text-slate-600 dark:text-slate-300 text-sm">Name</th>
+                                <th className="text-left py-2 px-3 font-medium text-slate-600 dark:text-slate-300 text-sm">Course</th>
+                                <th className="text-left py-2 px-3 font-medium text-slate-600 dark:text-slate-300 text-sm">Marks Obtained</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                              {selectedBatchStudents.map((student) => {
+                                // Find the student's enrollment to get course info
+                                const enrollment = enrollments?.find(
+                                  (e: Enrollment) => e.studentId === student.id && e.batchId === resultForm.getValues().batchId
+                                );
+                                const batch = batches?.find((b: Batch) => b.id === enrollment?.batchId);
+                                const course = courses?.find((c: Course) => c.id === batch?.courseId);
+                                
+                                return (
+                                  <tr key={student.id} className="hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
+                                    <td className="py-3 px-3 text-sm">STU{student.id.toString().padStart(3, '0')}</td>
+                                    <td className="py-3 px-3 text-sm">{student.firstName} {student.lastName}</td>
+                                    <td className="py-3 px-3 text-sm">{course?.name || "Unknown"}</td>
+                                    <td className="py-3 px-3 text-sm">
+                                      <Input 
+                                        type="number" 
+                                        placeholder="0"
+                                        className="w-24 h-8"
+                                        value={studentMarks[student.id] || 0}
+                                        onChange={(e) => {
+                                          const value = parseInt(e.target.value) || 0;
+                                          setStudentMarks(prev => ({
+                                            ...prev,
+                                            [student.id]: value
+                                          }));
+                                        }}
+                                      />
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   
-                  <FormField
-                    control={resultForm.control}
-                    name="remarks"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Remarks</FormLabel>
-                        <FormControl>
-                          <Textarea 
-                            placeholder="Enter remarks..."
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  {/* Remarks field removed as requested */}
 
                   <div className="flex items-center justify-end space-x-4 pt-6">
                     <Button type="button" variant="outline" onClick={() => setIsResultDialogOpen(false)}>
