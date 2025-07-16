@@ -31,6 +31,7 @@ import { z } from "zod";
 
 const attendanceFormSchema = insertAttendanceSchema.extend({
   // studentId field removed from form but will be set programmatically
+  courseId: z.number().optional(),
   batchId: z.number().min(1, "Batch is required"),
   // status field removed from form but will be set to default value
   date: z.date(),
@@ -69,6 +70,7 @@ export default function AttendancePage() {
   const form = useForm<z.infer<typeof attendanceFormSchema>>({    resolver: zodResolver(attendanceFormSchema),
     defaultValues: {
       // studentId removed from form
+      courseId: undefined,
       batchId: undefined,
       // status removed from form
       date: new Date(),
@@ -232,16 +234,48 @@ export default function AttendancePage() {
                   {/* Student and Status fields removed */}
                   <FormField
                     control={form.control}
+                    name="courseId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Course</FormLabel>
+                        <Select
+                          onValueChange={(value) => {
+                            field.onChange(parseInt(value));
+                            // Optionally reset batch selection when course changes
+                            form.setValue("batchId", undefined);
+                            setSelectedBatchId(null);
+                          }}
+                          value={field.value?.toString()}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select course" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {courses?.map((course: Course) => (
+                              <SelectItem key={course.id} value={course.id.toString()}>
+                                {course.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
                     name="batchId"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Batch</FormLabel>
-                        <Select 
+                        <Select
                           onValueChange={(value) => {
                             const batchId = parseInt(value);
                             field.onChange(batchId);
                             setSelectedBatchId(batchId);
-                          }} 
+                          }}
                           value={field.value?.toString()}
                         >
                           <FormControl>
@@ -250,14 +284,20 @@ export default function AttendancePage() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {batches?.map((batch: Batch) => {
-                              const course = courses?.find((c: Course) => c.id === batch.courseId);
-                              return (
-                                <SelectItem key={batch.id} value={batch.id.toString()}>
-                                  {batch.name} - {course?.name}
-                                </SelectItem>
-                              );
-                            })}
+                            {batches
+                              ?.filter((batch: Batch) =>
+                                form.getValues().courseId
+                                  ? batch.courseId === form.getValues().courseId
+                                  : true
+                              )
+                              .map((batch: Batch) => {
+                                const course = courses?.find((c: Course) => c.id === batch.courseId);
+                                return (
+                                  <SelectItem key={batch.id} value={batch.id.toString()}>
+                                    {batch.name} - {course?.name}
+                                  </SelectItem>
+                                );
+                              })}
                           </SelectContent>
                         </Select>
                         <FormMessage />

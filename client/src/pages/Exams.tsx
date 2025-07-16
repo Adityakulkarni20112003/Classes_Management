@@ -41,6 +41,7 @@ const examFormSchema = insertExamSchema.extend({
 });
 
 const resultFormSchema = insertExamResultSchema.extend({
+  courseId: z.number().optional(),
   examId: z.number().min(1, "Exam is required").optional().or(z.literal(undefined)),
   batchId: z.number().min(1, "Batch is required"),
   // Made these fields optional since they've been removed from the UI
@@ -140,6 +141,7 @@ export default function Exams() {
   const resultForm = useForm<z.infer<typeof resultFormSchema>>({    
     resolver: zodResolver(resultFormSchema),
     defaultValues: {
+      courseId: undefined,
       examId: undefined,
       batchId: undefined,
       // Removed default values for fields that have been removed from the UI
@@ -477,13 +479,19 @@ export default function Exams() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {batches?.map((batch: Batch) => {
-                                const course = courses?.find((c: Course) => c.id === batch.courseId);
-                                return (
-                                  <SelectItem key={batch.id} value={batch.id.toString()}>
-                                    {batch.name} - {course?.name}
-                                  </SelectItem>
-                                );
+                              {batches
+                                ?.filter((batch: Batch) => 
+                                  resultForm.getValues().courseId
+                                    ? batch.courseId === resultForm.getValues().courseId
+                                    : true
+                                )
+                                .map((batch: Batch) => {
+                                  const course = courses?.find((c: Course) => c.id === batch.courseId);
+                                  return (
+                                    <SelectItem key={batch.id} value={batch.id.toString()}>
+                                      {batch.name} - {course?.name}
+                                    </SelectItem>
+                                  );
                               })}
                             </SelectContent>
                           </Select>
@@ -583,6 +591,38 @@ export default function Exams() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <FormField
                       control={resultForm.control}
+                      name="courseId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Course</FormLabel>
+                          <Select
+                            onValueChange={(value) => {
+                              field.onChange(parseInt(value));
+                              // Reset batch and exam selection when course changes
+                              resultForm.setValue("batchId", undefined);
+                              resultForm.setValue("examId", undefined);
+                            }}
+                            value={field.value?.toString()}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select course" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {courses?.map((course: Course) => (
+                                <SelectItem key={course.id} value={course.id.toString()}>
+                                  {course.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={resultForm.control}
                       name="examId"
                       render={({ field }) => (
                         <FormItem>
@@ -609,33 +649,7 @@ export default function Exams() {
                                 />
                               </FormControl>
                               <div className="grid grid-cols-2 gap-4">
-                                <FormField
-                                  control={resultForm.control}
-                                  name="batchId"
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>Batch</FormLabel>
-                                      <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
-                                        <FormControl>
-                                          <SelectTrigger>
-                                            <SelectValue placeholder="Select batch" />
-                                          </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                          {batches?.map((batch: Batch) => {
-                                            const course = courses?.find((c: Course) => c.id === batch.courseId);
-                                            return (
-                                              <SelectItem key={batch.id} value={batch.id.toString()}>
-                                                {batch.name} - {course?.name}
-                                              </SelectItem>
-                                            );
-                                          })}
-                                        </SelectContent>
-                                      </Select>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
+                                
                                 <FormField
                                   control={examForm.control}
                                   name="totalMarks"
@@ -691,13 +705,19 @@ export default function Exams() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {batches?.map((batch: Batch) => {
-                                const course = courses?.find((c: Course) => c.id === batch.courseId);
-                                return (
-                                  <SelectItem key={batch.id} value={batch.id.toString()}>
-                                    {batch.name} - {course?.name}
-                                  </SelectItem>
-                                );
+                              {batches
+                                ?.filter((batch: Batch) => 
+                                  resultForm.getValues().courseId
+                                    ? batch.courseId === resultForm.getValues().courseId
+                                    : true
+                                )
+                                .map((batch: Batch) => {
+                                  const course = courses?.find((c: Course) => c.id === batch.courseId);
+                                  return (
+                                    <SelectItem key={batch.id} value={batch.id.toString()}>
+                                      {batch.name} - {course?.name}
+                                    </SelectItem>
+                                  );
                               })}
                             </SelectContent>
                           </Select>
