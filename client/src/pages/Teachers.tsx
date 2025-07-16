@@ -25,8 +25,9 @@ export default function Teachers() {
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
 
-  const { data: teachers, isLoading } = useQuery({
+  const { data: teachers, isLoading } = useQuery<Teacher[]>({
     queryKey: ["/api/teachers"],
+    initialData: [],
   });
 
   const deleteTeacherMutation = useMutation({
@@ -70,10 +71,6 @@ export default function Teachers() {
   return (
     <div className="p-8 space-y-8">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Teacher Management</h1>
-          <p className="text-slate-600 mt-1">Manage teaching staff, schedules, and performance tracking.</p>
-        </div>
         <div className="flex items-center space-x-3">
           <Button variant="outline">
             <Upload size={16} className="mr-2" />

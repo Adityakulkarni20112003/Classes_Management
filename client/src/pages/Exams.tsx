@@ -234,10 +234,7 @@ export default function Exams() {
   return (
     <div className="p-8 space-y-8">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Exam Management</h1>
-          <p className="text-slate-600 mt-1">Manage exams, results, and student performance tracking.</p>
-        </div>
+        
         <div className="flex items-center space-x-3">
           <Dialog open={isExamDialogOpen} onOpenChange={setIsExamDialogOpen}>
             <DialogTrigger asChild>

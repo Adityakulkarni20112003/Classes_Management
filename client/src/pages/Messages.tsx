@@ -193,10 +193,6 @@ export default function Messages() {
   return (
     <div className="p-8 space-y-8">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Message Center</h1>
-          <p className="text-slate-600 mt-1">Send announcements, notifications, and communicate with students and teachers.</p>
-        </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button className="bg-blue-600 hover:bg-blue-700 text-white">

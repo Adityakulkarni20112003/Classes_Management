@@ -180,10 +180,6 @@ export default function AttendancePage() {
   return (
     <div className="p-8 space-y-8">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Attendance Management</h1>
-          <p className="text-slate-600 mt-1">Track student attendance across all batches and courses.</p>
-        </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button className="bg-blue-600 hover:bg-blue-700 text-white">

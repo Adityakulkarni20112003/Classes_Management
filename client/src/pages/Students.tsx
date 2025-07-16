@@ -68,10 +68,6 @@ export default function Students() {
   return (
     <div className="p-8 space-y-8">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Student Management</h1>
-          <p className="text-slate-600 mt-1">Manage student information, enrollment, and academic records.</p>
-        </div>
         <div className="flex items-center space-x-3">
           <Button variant="outline">
             <Upload size={16} className="mr-2" />

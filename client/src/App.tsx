@@ -17,21 +17,63 @@ import NotFound from "@/pages/not-found";
 
 function Router() {
   return (
-    <Layout>
-      <Switch>
-        <Route path="/" component={Dashboard} />
-        <Route path="/dashboard" component={Dashboard} />
-        <Route path="/students" component={Students} />
-        <Route path="/teachers" component={Teachers} />
-        <Route path="/courses" component={Courses} />
-        <Route path="/batches" component={Batches} />
-        <Route path="/exams" component={Exams} />
-        <Route path="/attendance" component={Attendance} />
-        <Route path="/fees" component={Fees} />
-        <Route path="/messages" component={Messages} />
-        <Route component={NotFound} />
-      </Switch>
-    </Layout>
+    <Switch>
+      <Route path="/">
+        <Layout title="Dashboard" subtitle="Welcome back! Here's what's happening at your institute.">
+          <Dashboard />
+        </Layout>
+      </Route>
+      <Route path="/dashboard">
+        <Layout title="Dashboard" subtitle="Welcome back! Here's what's happening at your institute.">
+          <Dashboard />
+        </Layout>
+      </Route>
+      <Route path="/students">
+        <Layout title="Students" subtitle="Manage all the students in your institute.">
+          <Students />
+        </Layout>
+      </Route>
+      <Route path="/teachers">
+        <Layout title="Teachers" subtitle="Manage all the teachers in your institute.">
+          <Teachers />
+        </Layout>
+      </Route>
+      <Route path="/courses">
+        <Layout title="Courses" subtitle="Manage all the courses in your institute.">
+          <Courses />
+        </Layout>
+      </Route>
+      <Route path="/batches">
+        <Layout title="Batches" subtitle="Manage all the batches in your institute.">
+          <Batches />
+        </Layout>
+      </Route>
+      <Route path="/exams">
+        <Layout title="Exams" subtitle="Manage all the exams in your institute.">
+          <Exams />
+        </Layout>
+      </Route>
+      <Route path="/attendance">
+        <Layout title="Attendance" subtitle="Manage all the attendance in your institute.">
+          <Attendance />
+        </Layout>
+      </Route>
+      <Route path="/fees">
+        <Layout title="Fees" subtitle="Manage all the fees in your institute.">
+          <Fees />
+        </Layout>
+      </Route>
+      <Route path="/messages">
+        <Layout title="Messages" subtitle="Manage all the messages in your institute.">
+          <Messages />
+        </Layout>
+      </Route>
+      <Route>
+        <Layout title="404" subtitle="Page not found.">
+          <NotFound />
+        </Layout>
+      </Route>
+    </Switch>
   );
 }
 

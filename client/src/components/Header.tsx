@@ -2,13 +2,18 @@ import { Search, Bell, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
-export default function Header() {
+interface HeaderProps {
+  title: string;
+  subtitle: string;
+}
+
+export default function Header({ title, subtitle }: HeaderProps) {
   return (
     <header className="bg-white shadow-sm border-b border-gray-100 px-8 py-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-          <p className="text-slate-600 mt-1">Welcome back! Here's what's happening at your institute.</p>
+          <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
+          <p className="text-slate-600 mt-1">{subtitle}</p>
         </div>
         <div className="flex items-center space-x-4">
           {/* Search */}
