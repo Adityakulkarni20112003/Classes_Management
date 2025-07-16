@@ -78,7 +78,7 @@ export interface IStorage {
   // Exam Results
   getExamResults(): Promise<ExamResult[]>;
   getExamResultsByExam(examId: number): Promise<ExamResult[]>;
-  getExamResultsByStudent(studentId: number): Promise<ExamResult[]>;
+  getExamResultsByBatch(batchId: number): Promise<ExamResult[]>;
   createExamResult(result: InsertExamResult): Promise<ExamResult>;
   updateExamResult(id: number, result: Partial<InsertExamResult>): Promise<ExamResult>;
 
@@ -376,8 +376,8 @@ export class MemStorage implements IStorage {
     return Array.from(this.examResults.values()).filter(r => r.examId === examId);
   }
 
-  async getExamResultsByStudent(studentId: number): Promise<ExamResult[]> {
-    return Array.from(this.examResults.values()).filter(r => r.studentId === studentId);
+  async getExamResultsByBatch(batchId: number): Promise<ExamResult[]> {
+    return Array.from(this.examResults.values()).filter(r => r.batchId === batchId);
   }
 
   async createExamResult(result: InsertExamResult): Promise<ExamResult> {
@@ -385,7 +385,7 @@ export class MemStorage implements IStorage {
     const newResult: ExamResult = { 
       ...result, 
       id,
-      studentId: result.studentId || null,
+      batchId: result.batchId || null,
       examId: result.examId || null,
       marksObtained: result.marksObtained || null,
       grade: result.grade || null,

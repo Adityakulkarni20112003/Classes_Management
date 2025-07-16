@@ -233,10 +233,10 @@ export default function Messages() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="announcement">Announcement</SelectItem>
+                            <SelectItem value="attendance">Attendance</SelectItem>
+                            <SelectItem value="fess reminder">Fess Reminder</SelectItem>
+                            <SelectItem value="result">Result</SelectItem>
                             <SelectItem value="notification">Notification</SelectItem>
-                            <SelectItem value="reminder">Reminder</SelectItem>
-                            <SelectItem value="alert">Alert</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -257,8 +257,8 @@ export default function Messages() {
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="all">All Users</SelectItem>
-                            <SelectItem value="student">Students</SelectItem>
-                            <SelectItem value="teacher">Teachers</SelectItem>
+                            <SelectItem value="11 (A)">11 (A)</SelectItem>
+                            <SelectItem value="12 (B)">12 (B)</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -353,78 +353,7 @@ export default function Messages() {
         </Dialog>
       </div>
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-        <Card className="glass-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-600">Total Messages</p>
-                <p className="text-2xl font-bold text-slate-900">{totalMessages}</p>
-              </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                <Mail className="text-blue-600" size={24} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-600">Sent</p>
-                <p className="text-2xl font-bold text-green-600">{sentMessages}</p>
-              </div>
-              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                <Send className="text-green-600" size={24} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-600">Drafts</p>
-                <p className="text-2xl font-bold text-yellow-600">{draftMessages}</p>
-              </div>
-              <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
-                <Edit className="text-yellow-600" size={24} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-600">Announcements</p>
-                <p className="text-2xl font-bold text-blue-600">{announcements}</p>
-              </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                <MessageCircle className="text-blue-600" size={24} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-600">Notifications</p>
-                <p className="text-2xl font-bold text-purple-600">{notifications}</p>
-              </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                <AlertCircle className="text-purple-600" size={24} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Statistics Cards section removed as requested */}
 
       {/* Messages List */}
       <Card className="glass-card rounded-2xl shadow-lg">
@@ -447,10 +376,10 @@ export default function Messages() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="announcement">Announcements</SelectItem>
-                  <SelectItem value="notification">Notifications</SelectItem>
-                  <SelectItem value="reminder">Reminders</SelectItem>
-                  <SelectItem value="alert">Alerts</SelectItem>
+                  <SelectItem value="announcement">Attendance</SelectItem>
+                  <SelectItem value="notification">Fess Reminder</SelectItem>
+                  <SelectItem value="reminder">Reults</SelectItem>
+                  <SelectItem value="alert">Notification</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -458,10 +387,10 @@ export default function Messages() {
                   <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="sent">Sent</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="failed">Failed</SelectItem>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="sent">11th (A)</SelectItem>
+                  <SelectItem value="draft">11th (A)</SelectItem>
+                  <SelectItem value="failed">12th </SelectItem>
                 </SelectContent>
               </Select>
             </div>

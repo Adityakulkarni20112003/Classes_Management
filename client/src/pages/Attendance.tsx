@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { 
   UserCheck, 
@@ -26,13 +26,13 @@ import { insertAttendanceSchema } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Attendance, Student, Batch, Course } from "@shared/schema";
+import type { Attendance, Student, Batch, Course, Enrollment } from "@shared/schema";
 import { z } from "zod";
 
 const attendanceFormSchema = insertAttendanceSchema.extend({
-  studentId: z.number().min(1, "Student is required"),
+  // studentId field removed from form but will be set programmatically
   batchId: z.number().min(1, "Batch is required"),
-  status: z.enum(["present", "absent", "late"]),
+  // status field removed from form but will be set to default value
   date: z.date(),
 });
 
@@ -42,6 +42,8 @@ export default function AttendancePage() {
   const [batchFilter, setBatchFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedBatchId, setSelectedBatchId] = useState<number | null>(null);
+  const [batchStudents, setBatchStudents] = useState<Student[]>([]);
   const { toast } = useToast();
 
   const { data: attendance, isLoading: attendanceLoading } = useQuery({
@@ -59,19 +61,22 @@ export default function AttendancePage() {
   const { data: courses } = useQuery({
     queryKey: ["/api/courses"],
   });
+  
+  const { data: enrollments } = useQuery({
+    queryKey: ["/api/enrollments"],
+  });
 
-  const form = useForm<z.infer<typeof attendanceFormSchema>>({
-    resolver: zodResolver(attendanceFormSchema),
+  const form = useForm<z.infer<typeof attendanceFormSchema>>({    resolver: zodResolver(attendanceFormSchema),
     defaultValues: {
-      studentId: undefined,
+      // studentId removed from form
       batchId: undefined,
-      status: "present",
+      // status removed from form
       date: new Date(),
     },
   });
 
   const createAttendanceMutation = useMutation({
-    mutationFn: async (data: z.infer<typeof attendanceFormSchema>) => {
+    mutationFn: async (data: z.infer<typeof attendanceFormSchema> & { studentId: number, status: string }) => {
       const response = await apiRequest("POST", "/api/attendance", data);
       return response.json();
     },
@@ -114,8 +119,38 @@ export default function AttendancePage() {
     },
   });
 
+  // Function to get students enrolled in a batch
+  const getStudentsForBatch = (batchId: number) => {
+    if (!enrollments || !students) return [];
+    
+    // Find enrollments for the selected batch
+    const batchEnrollments = enrollments.filter((enrollment: Enrollment) => 
+      enrollment.batchId === batchId && enrollment.status === "active"
+    );
+    
+    // Get student details for each enrollment
+    const batchStudents = batchEnrollments.map((enrollment: Enrollment) => {
+      return students.find((student: Student) => student.id === enrollment.studentId);
+    }).filter(Boolean) as Student[];
+    
+    return batchStudents;
+  };
+  
+  // Update students list when batch changes
+  useEffect(() => {
+    if (selectedBatchId) {
+      const studentsInBatch = getStudentsForBatch(selectedBatchId);
+      setBatchStudents(studentsInBatch);
+    } else {
+      setBatchStudents([]);
+    }
+  }, [selectedBatchId, enrollments, students]);
+
   const onSubmit = (data: z.infer<typeof attendanceFormSchema>) => {
-    createAttendanceMutation.mutate(data);
+    // Form submission is now only used to select batch and date
+    // Individual student attendance is marked via buttons in the student list
+    // This function is kept for form validation and potential future use
+    return false; // Prevent default form submission
   };
 
   // Filter attendance records
@@ -193,38 +228,22 @@ export default function AttendancePage() {
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField
-                    control={form.control}
-                    name="studentId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Student</FormLabel>
-                        <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select student" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {students?.map((student: Student) => (
-                              <SelectItem key={student.id} value={student.id.toString()}>
-                                {student.firstName} {student.lastName}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                <div className="grid grid-cols-2 gap-6">
+                  {/* Student and Status fields removed */}
                   <FormField
                     control={form.control}
                     name="batchId"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Batch</FormLabel>
-                        <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
+                        <Select 
+                          onValueChange={(value) => {
+                            const batchId = parseInt(value);
+                            field.onChange(batchId);
+                            setSelectedBatchId(batchId);
+                          }} 
+                          value={field.value?.toString()}
+                        >
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select batch" />
@@ -239,28 +258,6 @@ export default function AttendancePage() {
                                 </SelectItem>
                               );
                             })}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="status"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Status</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select status" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="present">Present</SelectItem>
-                            <SelectItem value="absent">Absent</SelectItem>
-                            <SelectItem value="late">Late</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -284,14 +281,75 @@ export default function AttendancePage() {
                       </FormItem>
                     )}
                   />
+                  
+                  {/* Student List Table */}
+                  {selectedBatchId && batchStudents.length > 0 && (
+                    <div className="col-span-2 mt-4">
+                      <h3 className="text-lg font-medium mb-2">Students in Selected Batch</h3>
+                      <div className="border rounded-md overflow-hidden">
+                        <table className="w-full">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Roll No.</th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mark Attendance</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {batchStudents.map((student, index) => (
+                              <tr key={student.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                <td className="px-4 py-3 text-sm">{index + 1}</td>
+                                <td className="px-4 py-3 text-sm">{student.firstName} {student.lastName}</td>
+                                <td className="px-4 py-3 text-sm">
+                                  <div className="flex space-x-2">
+                                    <Button 
+                                      type="button" 
+                                      size="sm" 
+                                      variant="outline" 
+                                      className="bg-green-50 text-green-600 border-green-200 hover:bg-green-100"
+                                      onClick={() => {
+                                        const attendanceData = {
+                                          studentId: student.id,
+                                          batchId: selectedBatchId,
+                                          date: form.getValues().date,
+                                          status: "present"
+                                        };
+                                        createAttendanceMutation.mutate(attendanceData);
+                                      }}
+                                    >
+                                      Present
+                                    </Button>
+                                    <Button 
+                                      type="button" 
+                                      size="sm" 
+                                      variant="outline" 
+                                      className="bg-red-50 text-red-600 border-red-200 hover:bg-red-100"
+                                      onClick={() => {
+                                        const attendanceData = {
+                                          studentId: student.id,
+                                          batchId: selectedBatchId,
+                                          date: form.getValues().date,
+                                          status: "absent"
+                                        };
+                                        createAttendanceMutation.mutate(attendanceData);
+                                      }}
+                                    >
+                                      Absent
+                                    </Button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-end space-x-4 pt-6">
                   <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={createAttendanceMutation.isPending}>
-                    {createAttendanceMutation.isPending ? "Saving..." : "Mark Attendance"}
+                    Close
                   </Button>
                 </div>
               </form>
@@ -360,19 +418,7 @@ export default function AttendancePage() {
           </CardContent>
         </Card>
 
-        <Card className="glass-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-600">Late</p>
-                <p className="text-2xl font-bold text-yellow-600">{lateCount}</p>
-              </div>
-              <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
-                <Clock className="text-yellow-600" size={24} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Late card removed */}
 
         <Card className="glass-card">
           <CardContent className="p-6">
@@ -425,7 +471,6 @@ export default function AttendancePage() {
                   <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="present">Present</SelectItem>
                   <SelectItem value="absent">Absent</SelectItem>
-                  <SelectItem value="late">Late</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -75,7 +75,7 @@ export const exams = pgTable("exams", {
 export const examResults = pgTable("exam_results", {
   id: serial("id").primaryKey(),
   examId: integer("exam_id").references(() => exams.id),
-  studentId: integer("student_id").references(() => students.id),
+  batchId: integer("batch_id").references(() => batches.id),
   marksObtained: integer("marks_obtained"),
   grade: text("grade"),
   remarks: text("remarks"),

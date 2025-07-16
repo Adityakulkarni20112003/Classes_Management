@@ -41,8 +41,8 @@ const examFormSchema = insertExamSchema.extend({
 });
 
 const resultFormSchema = insertExamResultSchema.extend({
-  examId: z.number().min(1, "Exam is required"),
-  studentId: z.number().min(1, "Student is required"),
+  examId: z.number().min(1, "Exam is required").optional().or(z.literal(undefined)),
+  batchId: z.number().min(1, "Batch is required"),
   marksObtained: z.number().min(0, "Marks obtained is required"),
 });
 
@@ -52,6 +52,8 @@ export default function Exams() {
   const [activeTab, setActiveTab] = useState("exams");
   const [isExamDialogOpen, setIsExamDialogOpen] = useState(false);
   const [isResultDialogOpen, setIsResultDialogOpen] = useState(false);
+  const [newExamTitle, setNewExamTitle] = useState("");
+  const [showNewExamInput, setShowNewExamInput] = useState(false);
   const { toast } = useToast();
 
   const { data: exams, isLoading: examsLoading } = useQuery({
@@ -91,7 +93,7 @@ export default function Exams() {
     resolver: zodResolver(resultFormSchema),
     defaultValues: {
       examId: undefined,
-      studentId: undefined,
+      batchId: undefined,
       marksObtained: 0,
       grade: "",
       remarks: "",
@@ -168,8 +170,65 @@ export default function Exams() {
     createExamMutation.mutate(data);
   };
 
-  const onResultSubmit = (data: z.infer<typeof resultFormSchema>) => {
-    createResultMutation.mutate(data);
+  const onResultSubmit = async (data: z.infer<typeof resultFormSchema>) => {
+    try {
+      // Validate that either an exam is selected or a new exam title is provided
+      if (!data.examId && !newExamTitle.trim()) {
+        toast({
+          title: "Error",
+          description: "Please select an existing exam or enter a new exam title",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // If a new exam title is provided, create the exam first
+      if (newExamTitle.trim()) {
+        // Get the selected batch ID from the form
+        const batchId = data.batchId;
+        
+        if (!batchId) {
+          toast({
+            title: "Error",
+            description: "Please select a batch for the new exam",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // Create a new exam
+        const examData = {
+          title: newExamTitle.trim(),
+          batchId: batchId,
+          type: "written",
+          examDate: new Date(),
+          totalMarks: 100,
+          duration: 120,
+        };
+
+        const response = await apiRequest("POST", "/api/exams", examData);
+        const newExam = await response.json();
+        
+        // Update the form with the new exam ID
+        data.examId = newExam.id;
+        
+        // Reset the new exam title
+        setNewExamTitle("");
+        setShowNewExamInput(false);
+        
+        // Refresh exams data
+        queryClient.invalidateQueries({ queryKey: ["/api/exams"] });
+      }
+      
+      // Create the exam result
+      createResultMutation.mutate(data);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create exam or add result",
+        variant: "destructive",
+      });
+    }
   };
 
   const filteredExams = exams?.filter((exam: Exam) => {
@@ -188,13 +247,13 @@ export default function Exams() {
 
   const filteredResults = examResults?.filter((result: ExamResult) => {
     const exam = exams?.find((e: Exam) => e.id === result.examId);
-    const student = students?.find((s: Student) => s.id === result.studentId);
-    const batch = batches?.find((b: Batch) => b.id === exam?.batchId);
+    const batch = batches?.find((b: Batch) => b.id === result.batchId || b.id === exam?.batchId);
+    const course = courses?.find((c: Course) => c.id === batch?.courseId);
     
     const matchesSearch = 
-      student?.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student?.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      exam?.title?.toLowerCase().includes(searchTerm.toLowerCase());
+      exam?.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      batch?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      course?.name?.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesBatch = batchFilter === "all" || batch?.id === parseInt(batchFilter);
 
@@ -398,7 +457,15 @@ export default function Exams() {
             </DialogContent>
           </Dialog>
           
-          <Dialog open={isResultDialogOpen} onOpenChange={setIsResultDialogOpen}>
+          <Dialog open={isResultDialogOpen} onOpenChange={(open) => {
+            setIsResultDialogOpen(open);
+            if (!open) {
+              // Reset form and state when dialog is closed
+              resultForm.reset();
+              setNewExamTitle("");
+              setShowNewExamInput(false);
+            }
+          }}>
             <DialogTrigger asChild>
               <Button variant="outline">
                 <Award size={16} className="mr-2" />
@@ -417,43 +484,100 @@ export default function Exams() {
                       name="examId"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Exam</FormLabel>
-                          <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select exam" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {exams?.map((exam: Exam) => (
-                                <SelectItem key={exam.id} value={exam.id.toString()}>
-                                  {exam.title}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <div className="flex justify-between items-center mb-2">
+                            <FormLabel>Exam</FormLabel>
+                            <Button 
+                              type="button" 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => setShowNewExamInput(!showNewExamInput)}
+                              className="text-xs h-7 px-2"
+                            >
+                              {showNewExamInput ? "Select Existing Exam" : "Add New Exam"}
+                            </Button>
+                          </div>
+                          
+                          {showNewExamInput ? (
+                            <div className="space-y-2">
+                              <FormControl>
+                                <Textarea 
+                                  placeholder="Enter new exam title"
+                                  value={newExamTitle}
+                                  onChange={(e) => setNewExamTitle(e.target.value)}
+                                  className="resize-none"
+                                />
+                              </FormControl>
+                              <FormField
+                                control={resultForm.control}
+                                name="batchId"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Batch for New Exam</FormLabel>
+                                    <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
+                                      <FormControl>
+                                        <SelectTrigger>
+                                          <SelectValue placeholder="Select batch" />
+                                        </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent>
+                                        {batches?.map((batch: Batch) => {
+                                          const course = courses?.find((c: Course) => c.id === batch.courseId);
+                                          return (
+                                            <SelectItem key={batch.id} value={batch.id.toString()}>
+                                              {batch.name} - {course?.name}
+                                            </SelectItem>
+                                          );
+                                        })}
+                                      </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                          ) : (
+                            <>
+                              <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select exam" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {exams?.map((exam: Exam) => (
+                                    <SelectItem key={exam.id} value={exam.id.toString()}>
+                                      {exam.title}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </>
+                          )}
                           <FormMessage />
                         </FormItem>
                       )}
                     />
                     <FormField
                       control={resultForm.control}
-                      name="studentId"
+                      name="batchId"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Student</FormLabel>
+                          <FormLabel>Batch</FormLabel>
                           <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
                             <FormControl>
                               <SelectTrigger>
-                                <SelectValue placeholder="Select student" />
+                                <SelectValue placeholder="Select batch" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {students?.map((student: Student) => (
-                                <SelectItem key={student.id} value={student.id.toString()}>
-                                  {student.firstName} {student.lastName}
-                                </SelectItem>
-                              ))}
+                              {batches?.map((batch: Batch) => {
+                                const course = courses?.find((c: Course) => c.id === batch.courseId);
+                                return (
+                                  <SelectItem key={batch.id} value={batch.id.toString()}>
+                                    {batch.name} - {course?.name}
+                                  </SelectItem>
+                                );
+                              })}
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -771,7 +895,7 @@ export default function Exams() {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b border-gray-200">
-                        <th className="text-left py-3 px-4 font-medium text-slate-600 text-sm">Student</th>
+                        <th className="text-left py-3 px-4 font-medium text-slate-600 text-sm">Batch</th>
                         <th className="text-left py-3 px-4 font-medium text-slate-600 text-sm">Exam</th>
                         <th className="text-left py-3 px-4 font-medium text-slate-600 text-sm">Marks</th>
                         <th className="text-left py-3 px-4 font-medium text-slate-600 text-sm">Grade</th>
@@ -783,7 +907,8 @@ export default function Exams() {
                     <tbody className="divide-y divide-gray-100">
                       {filteredResults.map((result: ExamResult) => {
                         const exam = exams?.find((e: Exam) => e.id === result.examId);
-                        const student = students?.find((s: Student) => s.id === result.studentId);
+                        const batch = batches?.find((b: Batch) => b.id === result.batchId || b.id === exam?.batchId);
+                        const course = courses?.find((c: Course) => c.id === batch?.courseId);
                         const percentage = exam?.totalMarks ? ((result.marksObtained || 0) / exam.totalMarks * 100).toFixed(1) : 0;
                         
                         return (
@@ -791,11 +916,11 @@ export default function Exams() {
                             <td className="py-4 px-4">
                               <div className="flex items-center space-x-3">
                                 <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-medium">
-                                  {student?.firstName?.[0]}{student?.lastName?.[0]}
+                                  <BookOpen size={20} />
                                 </div>
                                 <div>
-                                  <p className="font-medium text-slate-900">{student?.firstName} {student?.lastName}</p>
-                                  <p className="text-sm text-slate-500">{student?.email}</p>
+                                  <p className="font-medium text-slate-900">{batch?.name || "Unknown Batch"}</p>
+                                  <p className="text-sm text-slate-500">{course?.name || "Unknown Course"}</p>
                                 </div>
                               </div>
                             </td>
