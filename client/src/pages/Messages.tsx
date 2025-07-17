@@ -15,7 +15,8 @@ import {
   User,
   Users,
   Calendar,
-  AlertCircle
+  AlertCircle,
+  GraduationCap
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,8 +38,10 @@ import { z } from "zod";
 const messageFormSchema = insertMessageSchema.extend({
   subject: z.string().min(1, "Subject is required"),
   content: z.string().min(1, "Content is required"),
-  recipientType: z.enum(["student", "teacher", "all"]),
+  recipientType: z.enum(["student", "teacher", "parent", "batch", "all"]),
   recipientId: z.number().optional(),
+  courseId: z.number().optional(),
+  batchId: z.number().optional(),
 });
 
 export default function Messages() {
@@ -60,6 +63,27 @@ export default function Messages() {
     queryKey: ["/api/teachers"],
   });
 
+  const { data: courses } = useQuery({
+    queryKey: ["/api/courses"],
+  });
+
+  const { data: batches } = useQuery({
+    queryKey: ["/api/batches"],
+  });
+
+  const { data: parents } = useQuery({
+    queryKey: ["/api/students"],
+    select: (data) => {
+      return data?.filter((student: any) => student.parentName && student.parentPhone)
+        .map((student: any) => ({
+          id: student.id,
+          name: student.parentName,
+          phone: student.parentPhone,
+          studentName: `${student.firstName} ${student.lastName}`
+        }));
+    }
+  });
+
   const form = useForm<z.infer<typeof messageFormSchema>>({
     resolver: zodResolver(messageFormSchema),
     defaultValues: {
@@ -68,6 +92,8 @@ export default function Messages() {
       type: "announcement",
       recipientType: "all",
       recipientId: undefined,
+      courseId: undefined,
+      batchId: undefined,
       sentBy: "Admin",
     },
   });
@@ -120,6 +146,12 @@ export default function Messages() {
   });
 
   const onSubmit = (data: z.infer<typeof messageFormSchema>) => {
+    // If recipient type is batch, use batchId as recipientId
+    if (data.recipientType === "batch" && data.batchId) {
+      data.recipientId = data.batchId;
+    }
+    
+    // Include courseId and batchId in the message data
     createMessageMutation.mutate(data);
   };
 
@@ -175,6 +207,18 @@ export default function Messages() {
         return teacher ? `${teacher.firstName} ${teacher.lastName}` : "Unknown Teacher";
       }
       return "All Teachers";
+    } else if (message.recipientType === "parent") {
+      if (message.recipientId) {
+        const student = students?.find((s: Student) => s.id === message.recipientId);
+        return student?.parentName ? `${student.parentName} (Parent of ${student.firstName} ${student.lastName})` : "Unknown Parent";
+      }
+      return "All Parents";
+    } else if (message.recipientType === "batch") {
+      if (message.batchId) {
+        const batch = batches?.find((b: any) => b.id === message.batchId);
+        return batch ? `Batch: ${batch.name}` : "Unknown Batch";
+      }
+      return "All Batches";
     }
     return "Unknown";
   };
@@ -245,6 +289,69 @@ export default function Messages() {
                   />
                   <FormField
                     control={form.control}
+                    name="courseId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Course</FormLabel>
+                        <Select 
+                          onValueChange={(value) => {
+                            field.onChange(value && value !== 'all' ? parseInt(value) : undefined);
+                            form.setValue("batchId", undefined);
+                          }} 
+                          value={field.value?.toString()}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select course" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="all">All Courses</SelectItem>
+                            {courses?.map((course: any) => (
+                              <SelectItem key={course.id} value={course.id.toString()}>
+                                {course.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="batchId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Batch</FormLabel>
+                        <Select 
+                          onValueChange={(value) => field.onChange(value && value !== 'all' ? parseInt(value) : undefined)} 
+                          value={field.value?.toString()}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select batch" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="all">All Batches</SelectItem>
+                            {batches
+                              ?.filter((batch: any) => !form.watch("courseId") || batch.courseId === form.watch("courseId"))
+                              .map((batch: any) => (
+                                <SelectItem key={batch.id} value={batch.id.toString()}>
+                                  {batch.name}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
                     name="recipientType"
                     render={({ field }) => (
                       <FormItem>
@@ -257,8 +364,10 @@ export default function Messages() {
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="all">All Users</SelectItem>
-                            <SelectItem value="11 (A)">11 (A)</SelectItem>
-                            <SelectItem value="12 (B)">12 (B)</SelectItem>
+                            <SelectItem value="student">Students</SelectItem>
+                            <SelectItem value="teacher">Teachers</SelectItem>
+                            <SelectItem value="parent">Parents</SelectItem>
+                            <SelectItem value="batch">Batch</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -272,14 +381,14 @@ export default function Messages() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Specific Student (Optional)</FormLabel>
-                          <Select onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)} value={field.value?.toString()}>
+                          <Select onValueChange={(value) => field.onChange(value && value !== 'all' ? parseInt(value) : undefined)} value={field.value?.toString()}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select student or leave empty for all" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="">All Students</SelectItem>
+                              <SelectItem value="all">All Students</SelectItem>
                               {students?.map((student: Student) => (
                                 <SelectItem key={student.id} value={student.id.toString()}>
                                   {student.firstName} {student.lastName}
@@ -299,14 +408,14 @@ export default function Messages() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Specific Teacher (Optional)</FormLabel>
-                          <Select onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)} value={field.value?.toString()}>
+                          <Select onValueChange={(value) => field.onChange(value && value !== 'all' ? parseInt(value) : undefined)} value={field.value?.toString()}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select teacher or leave empty for all" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="">All Teachers</SelectItem>
+                              <SelectItem value="all">All Teachers</SelectItem>
                               {teachers?.map((teacher: Teacher) => (
                                 <SelectItem key={teacher.id} value={teacher.id.toString()}>
                                   {teacher.firstName} {teacher.lastName}
@@ -314,6 +423,50 @@ export default function Messages() {
                               ))}
                             </SelectContent>
                           </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                  
+                  {form.watch("recipientType") === "parent" && (
+                    <FormField
+                      control={form.control}
+                      name="recipientId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Specific Parent (Optional)</FormLabel>
+                          <Select onValueChange={(value) => field.onChange(value && value !== 'all' ? parseInt(value) : undefined)} value={field.value?.toString()}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select parent or leave empty for all" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="all">All Parents</SelectItem>
+                              {parents?.map((parent: any) => (
+                                <SelectItem key={parent.id} value={parent.id.toString()}>
+                                  {parent.name} (Parent of {parent.studentName})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                  
+                  {form.watch("recipientType") === "batch" && form.watch("batchId") && (
+                    <FormField
+                      control={form.control}
+                      name="recipientId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Selected Batch</FormLabel>
+                          <div className="p-2 border rounded-md bg-gray-50">
+                            {batches?.find((batch: any) => batch.id === form.watch("batchId"))?.name || "Selected Batch"}
+                          </div>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -435,6 +588,8 @@ export default function Messages() {
                           {message.recipientType === "all" && <Users size={14} className="text-slate-400" />}
                           {message.recipientType === "student" && <User size={14} className="text-slate-400" />}
                           {message.recipientType === "teacher" && <User size={14} className="text-slate-400" />}
+                          {message.recipientType === "parent" && <User size={14} className="text-slate-400" />}
+                          {message.recipientType === "batch" && <GraduationCap size={14} className="text-slate-400" />}
                           <span className="text-sm text-slate-600">{getRecipientDisplay(message)}</span>
                         </div>
                       </td>

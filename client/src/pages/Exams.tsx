@@ -35,6 +35,7 @@ import { z } from "zod";
 
 const examFormSchema = insertExamSchema.extend({
   title: z.string().min(1, "Exam title is required"),
+  courseId: z.number().min(1, "Course is required"),
   batchId: z.number().min(1, "Batch is required"),
   examDate: z.date(),
   totalMarks: z.number().min(1, "Total marks is required"),
@@ -125,11 +126,12 @@ export default function Exams() {
     },
   });
 
-  const examForm = useForm<z.infer<typeof examFormSchema>>({
+  const examForm = useForm<z.infer<typeof examFormSchema>>({    
     resolver: zodResolver(examFormSchema),
     defaultValues: {
       title: "",
       type: "written",
+      courseId: undefined,
       batchId: undefined,
       examDate: new Date(),
       duration: 120,
@@ -151,7 +153,10 @@ export default function Exams() {
     },
   });
   
-  // Watch for batchId changes
+  // Watch for courseId and batchId changes in examForm
+  const selectedCourseId = examForm.watch('courseId');
+  
+  // Watch for batchId changes in resultForm
   const selectedBatchId = resultForm.watch('batchId');
   
   // Update selectedBatchStudents when batchId changes
@@ -468,6 +473,34 @@ export default function Exams() {
                     </div>
                     <FormField
                       control={examForm.control}
+                      name="courseId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Course</FormLabel>
+                          <Select onValueChange={(value) => {
+                            field.onChange(parseInt(value));
+                            // Reset batchId when course changes
+                            examForm.setValue('batchId', undefined);
+                          }} value={field.value?.toString()}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select course" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {courses?.map((course: Course) => (
+                                <SelectItem key={course.id} value={course.id.toString()}>
+                                  {course.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={examForm.control}
                       name="batchId"
                       render={({ field }) => (
                         <FormItem>
@@ -481,15 +514,15 @@ export default function Exams() {
                             <SelectContent>
                               {batches
                                 ?.filter((batch: Batch) => 
-                                  resultForm.getValues().courseId
-                                    ? batch.courseId === resultForm.getValues().courseId
+                                  selectedCourseId
+                                    ? batch.courseId === selectedCourseId
                                     : true
                                 )
                                 .map((batch: Batch) => {
                                   const course = courses?.find((c: Course) => c.id === batch.courseId);
                                   return (
                                     <SelectItem key={batch.id} value={batch.id.toString()}>
-                                      {batch.name} - {course?.name}
+                                      {batch.name} {course ? `- ${course.name}` : ''}
                                     </SelectItem>
                                   );
                               })}

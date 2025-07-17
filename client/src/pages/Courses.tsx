@@ -46,6 +46,8 @@ const batchFormSchema = insertBatchSchema.extend({
 export default function Courses() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [batchSearchTerm, setBatchSearchTerm] = useState("");
+  const [batchStatusFilter, setBatchStatusFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("courses");
   const [isCourseDialogOpen, setIsCourseDialogOpen] = useState(false);
   const [isBatchDialogOpen, setIsBatchDialogOpen] = useState(false);
@@ -71,7 +73,8 @@ export default function Courses() {
     queryKey: ["/api/teachers"],
   });
 
-  const courseForm = useForm<z.infer<typeof courseFormSchema>>({    resolver: zodResolver(courseFormSchema),
+  const courseForm = useForm<z.infer<typeof courseFormSchema>>({
+    resolver: zodResolver(courseFormSchema),
     defaultValues: {
       name: "",
       description: "",
@@ -81,7 +84,8 @@ export default function Courses() {
     },
   });
   
-  const batchForm = useForm<z.infer<typeof batchFormSchema>>({    resolver: zodResolver(batchFormSchema),
+  const batchForm = useForm<z.infer<typeof batchFormSchema>>({
+    resolver: zodResolver(batchFormSchema),
     defaultValues: {
       name: "",
       courseId: undefined,
@@ -177,6 +181,16 @@ export default function Courses() {
 
     return matchesSearch && matchesStatus;
   }) || [];
+  
+  const filteredBatches = batches?.filter((batch: Batch) => {
+    const matchesSearch = batch.name?.toLowerCase().includes(batchSearchTerm.toLowerCase());
+    
+    const matchesStatus = batchStatusFilter === "all" || 
+                         (batchStatusFilter === "active" && batch.isActive) ||
+                         (batchStatusFilter === "inactive" && !batch.isActive);
+
+    return matchesSearch && matchesStatus;
+  }) || [];
 
   // Calculate course statistics
   const getCourseBatches = (courseId: number) => {
@@ -198,7 +212,7 @@ export default function Courses() {
 
   if (coursesLoading) {
     return (
-      <div className="p-8">
+      <div className="min-h-screen bg-gray-50 p-8">
         <div className="animate-pulse space-y-6">
           <div className="h-8 bg-gray-200 rounded w-1/4"></div>
           <div className="h-64 bg-gray-200 rounded"></div>
@@ -208,16 +222,12 @@ export default function Courses() {
   }
 
   return (
-    <div className="p-8 space-y-8">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <div className="flex items-center justify-between mb-8">
-          <TabsList>
-            <TabsTrigger value="courses">Courses</TabsTrigger>
-            <TabsTrigger value="batches">Batches</TabsTrigger>
-          </TabsList>
-        </div>
-        
-        {activeTab === "courses" ? (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
+        {/* Header with Actions */}
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold text-gray-900">Course Management</h1>
+          <div className="flex items-center space-x-3">
             <Dialog open={isCourseDialogOpen} onOpenChange={setIsCourseDialogOpen}>
               <DialogTrigger asChild>
                 <Button className="bg-blue-600 hover:bg-blue-700 text-white">
@@ -225,154 +235,257 @@ export default function Courses() {
                   Add Course
                 </Button>
               </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Create New Course</DialogTitle>
-              </DialogHeader>
-              <Form {...courseForm}>
-                <form onSubmit={courseForm.handleSubmit(onCourseSubmit)} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField
-                    control={courseForm.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Course Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter course name" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={courseForm.control}
-                    name="teacherId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Teacher</FormLabel>
-                        <Select
-                          onValueChange={(value) => field.onChange(parseInt(value))}
-                          defaultValue={field.value?.toString()}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select teacher" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {teachers?.map((teacher: Teacher) => (
-                              <SelectItem key={teacher.id} value={teacher.id.toString()}>
-                                {teacher.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                
-
-
-                <div className="flex items-center justify-end space-x-4 pt-6">
-                   <Button type="button" variant="outline" onClick={() => setIsCourseDialogOpen(false)}>
-                     Cancel
-                   </Button>
-                   <Button
-                    type="submit"
-                    disabled={createCourseMutation.isPending}
-                  >
-                    {createCourseMutation.isPending ? "Creating..." : "Create Course"}
-                  </Button>
-                </div>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
-        ) : (
-          <Dialog open={isBatchDialogOpen} onOpenChange={setIsBatchDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-                <Plus size={16} className="mr-2" />
-                Add Batch
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Create New Batch</DialogTitle>
-              </DialogHeader>
-              <Form {...batchForm}>
-                <form onSubmit={batchForm.handleSubmit(onBatchSubmit)} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <FormField
-                      control={batchForm.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Batch Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter batch name" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <FormField
-                      control={batchForm.control}
-                      name="courseId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Course</FormLabel>
-                          <Select
-                            onValueChange={(value) => field.onChange(parseInt(value))}
-                            defaultValue={field.value?.toString()}
-                          >
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Create New Course</DialogTitle>
+                </DialogHeader>
+                <Form {...courseForm}>
+                  <form onSubmit={courseForm.handleSubmit(onCourseSubmit)} className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <FormField
+                        control={courseForm.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Course Name</FormLabel>
                             <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select course" />
-                              </SelectTrigger>
+                              <Input placeholder="Enter course name" {...field} />
                             </FormControl>
-                            <SelectContent>
-                              {courses?.map((course: Course) => (
-                                <SelectItem key={course.id} value={course.id.toString()}>
-                                  {course.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={courseForm.control}
+                        name="teacherId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Teacher</FormLabel>
+                            <Select
+                              onValueChange={(value) => field.onChange(parseInt(value))}
+                              defaultValue={field.value?.toString()}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select teacher" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {teachers?.map((teacher: Teacher) => (
+                                  <SelectItem key={teacher.id} value={teacher.id.toString()}>
+                                    {teacher.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <FormField
+                        control={courseForm.control}
+                        name="duration"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Duration (months)</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                placeholder="Enter duration" 
+                                {...field}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={courseForm.control}
+                        name="fee"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Fee (₹)</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Enter fee amount" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <FormField
+                      control={courseForm.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Description</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Enter course description" 
+                              className="resize-none"
+                              rows={4}
+                              {...field} 
+                            />
+                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
+                    <div className="flex items-center justify-end space-x-4 pt-6">
+                      <Button type="button" variant="outline" onClick={() => setIsCourseDialogOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button
+                        type="submit"
+                        disabled={createCourseMutation.isPending}
+                      >
+                        {createCourseMutation.isPending ? "Creating..." : "Create Course"}
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+            
+            <Dialog open={isBatchDialogOpen} onOpenChange={setIsBatchDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <GraduationCap size={16} className="mr-2" />
+                  Add Batch
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Create New Batch</DialogTitle>
+                </DialogHeader>
+                <Form {...batchForm}>
+                  <form onSubmit={batchForm.handleSubmit(onBatchSubmit)} className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <FormField
+                        control={batchForm.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Batch Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Enter batch name" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={batchForm.control}
+                        name="courseId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Course</FormLabel>
+                            <Select
+                              onValueChange={(value) => field.onChange(parseInt(value))}
+                              defaultValue={field.value?.toString()}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select course" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {courses?.map((course: Course) => (
+                                  <SelectItem key={course.id} value={course.id.toString()}>
+                                    {course.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <FormField
+                        control={batchForm.control}
+                        name="teacherId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Teacher</FormLabel>
+                            <Select
+                              onValueChange={(value) => field.onChange(parseInt(value))}
+                              defaultValue={field.value?.toString()}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select teacher" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {teachers?.map((teacher: Teacher) => (
+                                  <SelectItem key={teacher.id} value={teacher.id.toString()}>
+                                    {teacher.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={batchForm.control}
+                        name="capacity"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Capacity</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                placeholder="Enter capacity" 
+                                {...field}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 30)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <FormField
+                      control={batchForm.control}
+                      name="schedule"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Schedule</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g., Mon-Fri, 9:00 AM - 12:00 PM" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="flex items-center justify-end space-x-4 pt-6">
+                      <Button type="button" variant="outline" onClick={() => setIsBatchDialogOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button
+                        type="submit"
+                        disabled={createBatchMutation.isPending}
+                      >
+                        {createBatchMutation.isPending ? "Creating..." : "Create Batch"}
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
 
-                  </div>
-
-                  <div className="flex items-center justify-end space-x-4 pt-6">
-                    <Button type="button" variant="outline" onClick={() => setIsBatchDialogOpen(false)}>
-                      Cancel
-                    </Button>
-                    <Button
-                      type="submit"
-                      disabled={createBatchMutation.isPending}
-                    >
-                      {createBatchMutation.isPending ? "Creating..." : "Create Batch"}
-                    </Button>
-                  </div>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
-        )}
-
-        <TabsContent value="courses">
         {/* Statistics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card className="glass-card">
+          <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -386,7 +499,7 @@ export default function Courses() {
             </CardContent>
           </Card>
 
-          <Card className="glass-card">
+          <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -400,7 +513,7 @@ export default function Courses() {
             </CardContent>
           </Card>
 
-          <Card className="glass-card">
+          <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -414,7 +527,7 @@ export default function Courses() {
             </CardContent>
           </Card>
 
-          <Card className="glass-card">
+          <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -429,340 +542,285 @@ export default function Courses() {
           </Card>
         </div>
 
-        {/* Courses List */}
-        <Card className="glass-card rounded-2xl shadow-lg mt-8">
-          <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
-              <CardTitle>All Courses ({filteredCourses.length})</CardTitle>
-              <div className="flex items-center space-x-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={16} />
-                  <Input
-                    placeholder="Search courses..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 w-60"
-                  />
+        {/* Tabs for Courses and Batches */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsTrigger value="courses">Courses</TabsTrigger>
+            <TabsTrigger value="batches">Batches</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="courses" className="space-y-6">
+            <Card className="bg-white shadow-md">
+              <CardHeader className="pb-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <CardTitle>All Courses ({filteredCourses.length})</CardTitle>
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={16} />
+                      <Input
+                        placeholder="Search courses..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10 w-full sm:w-60"
+                      />
+                    </div>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-full sm:w-40">
+                        <SelectValue placeholder="Filter by status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Courses</SelectItem>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-40">
-                    <SelectValue placeholder="Filter by status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Courses</SelectItem>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {filteredCourses.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredCourses.map((course: Course) => {
-                  const courseBatches = getCourseBatches(course.id);
-                  const courseStudents = getCourseStudents(course.id);
-                  
-                  return (
-                    <Card key={course.id} className="glass-card border border-gray-200 hover:shadow-lg transition-shadow">
-                      <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
-                            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold">
-                              {course.name?.charAt(0) || 'C'}
-                            </div>
-                            <div>
-                              <h3 className="font-semibold text-slate-900">{course.name}</h3>
-                              <p className="text-sm text-slate-500">CRS{course.id.toString().padStart(3, '0')}</p>
-                            </div>
-                          </div>
-                          <Badge variant={course.isActive ? "default" : "secondary"}>
-                            {course.isActive ? "Active" : "Inactive"}
-                          </Badge>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div>
-                          <p className="text-sm text-slate-600 line-clamp-2">{course.description || "No description available"}</p>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="flex items-center space-x-2">
-                            <Clock className="text-slate-400" size={16} />
-                            <span className="text-sm text-slate-600">{course.duration || 0} months</span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <DollarSign className="text-slate-400" size={16} />
-                            <span className="text-sm text-slate-600">₹{course.fee || "0"}</span>
-                          </div>
-                        </div>
+              </CardHeader>
 
-                        <div className="border-t pt-4">
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="text-center">
-                              <p className="text-lg font-semibold text-slate-900">{courseBatches.length}</p>
-                              <p className="text-sm text-slate-500">Batches</p>
-                            </div>
-                            <div className="text-center">
-                              <p className="text-lg font-semibold text-slate-900">{courseStudents.length}</p>
-                              <p className="text-sm text-slate-500">Students</p>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Student List Preview */}
-                        {courseStudents.length > 0 && (
-                          <div className="border-t pt-4">
-                            <div className="flex items-center justify-between mb-2">
-                              <h4 className="text-sm font-medium text-slate-700">Enrolled Students</h4>
-                              <span className="text-xs text-slate-500">Recent</span>
-                            </div>
-                            <div className="space-y-2 max-h-20 overflow-y-auto">
-                              {courseStudents.slice(0, 3).map((enrollment: Enrollment) => {
-                                const student = students?.find((s: Student) => s.id === enrollment.studentId);
-                                const batch = batches?.find((b: Batch) => b.id === enrollment.batchId);
-                                
-                                return (
-                                  <div key={enrollment.id} className="flex items-center space-x-2">
-                                    <div className="w-6 h-6 bg-gradient-to-br from-green-500 to-blue-500 rounded-full flex items-center justify-center text-white text-xs font-medium">
-                                      {student?.firstName?.charAt(0) || 'S'}
+              <CardContent>
+                {filteredCourses.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <div className="inline-block min-w-full align-middle">
+                      <div className="overflow-hidden rounded-md border">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Course</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Teacher</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fee</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Batches</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Students</th>
+                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {filteredCourses.map((course: Course) => {
+                              const courseBatches = getCourseBatches(course.id);
+                              const courseStudents = getCourseStudents(course.id);
+                              const teacher = teachers?.find((t: Teacher) => t.id === course.teacherId);
+                              
+                              return (
+                                <tr key={course.id} className="hover:bg-gray-50">
+                                  <td className="px-4 py-4 whitespace-nowrap">
+                                    <div className="flex items-center space-x-3">
+                                      <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold">
+                                        {course.name?.charAt(0) || 'C'}
+                                      </div>
+                                      <div>
+                                        <h3 className="font-semibold text-slate-900">{course.name}</h3>
+                                        <p className="text-sm text-slate-500">CRS{course.id.toString().padStart(3, '0')}</p>
+                                      </div>
                                     </div>
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-sm font-medium text-slate-900 truncate">
-                                        {student?.firstName} {student?.lastName}
-                                      </p>
-                                      <p className="text-xs text-slate-500">{batch?.name}</p>
+                                  </td>
+                                  <td className="px-4 py-4 whitespace-nowrap text-sm text-slate-700">{teacher?.name || "--"}</td>
+                                  <td className="px-4 py-4 whitespace-nowrap text-sm text-slate-700">{course.duration || 0} months</td>
+                                  <td className="px-4 py-4 whitespace-nowrap text-sm text-slate-700">₹{course.fee || "0"}</td>
+                                  <td className="px-4 py-4 whitespace-nowrap">
+                                    <Badge variant={course.isActive ? "default" : "secondary"}>
+                                      {course.isActive ? "Active" : "Inactive"}
+                                    </Badge>
+                                  </td>
+                                  <td className="px-4 py-4 whitespace-nowrap">
+                                    <div className="flex items-center space-x-2">
+                                      <GraduationCap className="text-purple-600" size={16} />
+                                      <span className="text-sm font-medium">{courseBatches.length}</span>
                                     </div>
-                                  </div>
-                                );
-                              })}
-                              {courseStudents.length > 3 && (
-                                <p className="text-xs text-slate-500 text-center">
-                                  +{courseStudents.length - 3} more students
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="flex items-center justify-between pt-4 border-t">
-                          <div className="flex items-center space-x-2">
-                            <Button variant="ghost" size="sm">
-                              <Eye size={14} />
-                            </Button>
-                            <Button variant="ghost" size="sm">
-                              <Edit size={14} />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              onClick={() => deleteCourseMutation.mutate(course.id)}
-                              disabled={deleteCourseMutation.isPending}
-                            >
-                              <Trash2 size={14} />
-                            </Button>
-                          </div>
-                          <div className="text-xs text-slate-500">
-                            {courseBatches.length} batches
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <BookOpen className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No courses found</h3>
-                <p className="text-gray-500 mb-6">
-                  {searchTerm ? "Try adjusting your search criteria." : "Get started by creating your first course."}
-                </p>
-                {!searchTerm && (
-                  <Button onClick={() => setIsCourseDialogOpen(true)}>
-                    <Plus size={16} className="mr-2" />
-                    Add Course
-                  </Button>
+                                  </td>
+                                  <td className="px-4 py-4 whitespace-nowrap">
+                                    <div className="flex items-center space-x-2">
+                                      <Users className="text-blue-600" size={16} />
+                                      <span className="text-sm font-medium">{courseStudents.length}</span>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-4 whitespace-nowrap text-right">
+                                    <div className="flex justify-end space-x-1">
+                                      <Button variant="ghost" size="sm">
+                                        <Eye size={14} />
+                                      </Button>
+                                      <Button variant="ghost" size="sm">
+                                        <Edit size={14} />
+                                      </Button>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm"
+                                        onClick={() => deleteCourseMutation.mutate(course.id)}
+                                        disabled={deleteCourseMutation.isPending}
+                                      >
+                                        <Trash2 size={14} />
+                                      </Button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <BookOpen className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No courses found</h3>
+                    <p className="text-gray-500 mb-6">
+                      {searchTerm ? "Try adjusting your search criteria." : "Get started by creating your first course."}
+                    </p>
+                    {!searchTerm && (
+                      <Button onClick={() => setIsCourseDialogOpen(true)}>
+                        <Plus size={16} className="mr-2" />
+                        Add Course
+                      </Button>
+                    )}
+                  </div>
                 )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </TabsContent>
-      
-      <TabsContent value="batches">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card className="glass-card">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-600">Total Batches</p>
-                  <p className="text-2xl font-bold text-purple-600">{totalBatches}</p>
-                </div>
-                <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                  <GraduationCap className="text-purple-600" size={24} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </TabsContent>
           
-          <Card className="glass-card">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-600">Active Batches</p>
-                  <p className="text-2xl font-bold text-green-600">
-                    {batches?.filter((batch: Batch) => batch.isActive).length || 0}
-                  </p>
+          <TabsContent value="batches" className="space-y-6">
+            <Card className="bg-white shadow-md">
+              <CardHeader className="pb-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <CardTitle>All Batches ({filteredBatches?.length || 0})</CardTitle>
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={16} />
+                      <Input
+                        placeholder="Search batches..."
+                        value={batchSearchTerm}
+                        onChange={(e) => setBatchSearchTerm(e.target.value)}
+                        className="pl-10 w-full sm:w-60"
+                      />
+                    </div>
+                    <Select value={batchStatusFilter} onValueChange={setBatchStatusFilter}>
+                      <SelectTrigger className="w-full sm:w-40">
+                        <SelectValue placeholder="Filter by status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Batches</SelectItem>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                  <TrendingUp className="text-green-600" size={24} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="glass-card">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-600">Total Students</p>
-                  <p className="text-2xl font-bold text-orange-600">{totalStudents}</p>
-                </div>
-                <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
-                  <Users className="text-orange-600" size={24} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="glass-card">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-600">Total Teachers</p>
-                  <p className="text-2xl font-bold text-blue-600">{teachers?.length || 0}</p>
-                </div>
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                  <Users className="text-blue-600" size={24} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-        
-        <Card className="glass-card rounded-2xl shadow-lg mt-8">
-          <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
-              <CardTitle>All Batches</CardTitle>
-              <div className="flex items-center space-x-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={16} />
-                  <Input
-                    placeholder="Search batches..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 w-60"
-                  />
-                </div>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-40">
-                    <SelectValue placeholder="Filter by status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Batches</SelectItem>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {batchesLoading ? (
-              <div className="text-center py-10">Loading batches...</div>
-            ) : batches?.length === 0 ? (
-              <div className="text-center py-12">
-                <Users className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No batches found</h3>
-                <p className="text-gray-500 mb-6">
-                  {searchTerm ? "Try adjusting your search criteria." : "Get started by creating your first batch."}
-                </p>
-                {!searchTerm && (
-                  <Button onClick={() => setIsBatchDialogOpen(true)}>
-                    <Plus size={16} className="mr-2" />
-                    Add Batch
-                  </Button>
+              </CardHeader>
+              <CardContent>
+                {batchesLoading ? (
+                  <div className="flex justify-center items-center py-10">
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+                  </div>
+                ) : filteredBatches?.length === 0 ? (
+                  <div className="text-center py-12">
+                    <GraduationCap className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No batches found</h3>
+                    <p className="text-gray-500 mb-6">
+                      {batchSearchTerm ? "Try adjusting your search criteria." : "Get started by creating your first batch."}
+                    </p>
+                    {!batchSearchTerm && (
+                      <Button onClick={() => setIsBatchDialogOpen(true)}>
+                        <Plus size={16} className="mr-2" />
+                        Add Batch
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <div className="inline-block min-w-full align-middle">
+                      <div className="overflow-hidden rounded-md border">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Course</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Teacher</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Schedule</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Capacity</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {filteredBatches.map((batch: Batch) => {
+                              const course = courses?.find((c: Course) => c.id === batch.courseId);
+                              const teacher = teachers?.find((t: Teacher) => t.id === batch.teacherId);
+                              const batchEnrollments = enrollments?.filter((e: Enrollment) => e.batchId === batch.id) || [];
+                              
+                              return (
+                                <tr key={batch.id} className="hover:bg-gray-50">
+                                  <td className="px-4 py-4 whitespace-nowrap">
+                                    <div className="flex items-center space-x-3">
+                                      <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg flex items-center justify-center text-white font-bold">
+                                        {batch.name?.charAt(0) || 'B'}
+                                      </div>
+                                      <div>
+                                        <div className="font-medium text-slate-900">{batch.name}</div>
+                                        <div className="text-sm text-slate-500">BTH{batch.id.toString().padStart(3, '0')}</div>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-4 whitespace-nowrap">
+                                    <div className="flex items-center space-x-2">
+                                      <BookOpen className="text-blue-600" size={16} />
+                                      <span className="text-sm text-slate-700">{course?.name || "--"}</span>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-4 whitespace-nowrap">
+                                    <div className="flex items-center space-x-2">
+                                      <Users className="text-slate-400" size={16} />
+                                      <span className="text-sm text-slate-700">{teacher?.name || "--"}</span>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-4 whitespace-nowrap">
+                                    <div className="flex items-center space-x-2">
+                                      <Calendar className="text-slate-400" size={16} />
+                                      <span className="text-sm text-slate-700">{batch.schedule || "--"}</span>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-4 whitespace-nowrap">
+                                    <div className="flex items-center space-x-2">
+                                      <Users className="text-slate-400" size={16} />
+                                      <span className="text-sm text-slate-700">{batchEnrollments.length}/{batch.capacity || 30}</span>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-4 whitespace-nowrap">
+                                    <Badge
+                                      variant={batch.isActive ? "default" : "secondary"}
+                                      className="text-xs"
+                                    >
+                                      {batch.isActive ? "Active" : "Inactive"}
+                                    </Badge>
+                                  </td>
+                                  <td className="px-4 py-4 whitespace-nowrap text-right">
+                                    <div className="flex justify-end space-x-1">
+                                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                                        <Eye className="h-4 w-4" />
+                                      </Button>
+                                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                                        <Edit className="h-4 w-4" />
+                                      </Button>
+                                      <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:text-red-700">
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
                 )}
-              </div>
-            ) : (
-              <div className="rounded-md border overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-slate-50">
-                      <th className="py-3 px-4 text-left font-medium text-slate-700">Name</th>
-                      <th className="py-3 px-4 text-left font-medium text-slate-700">Course</th>
-                      <th className="py-3 px-4 text-left font-medium text-slate-700">Teacher</th>
-                      <th className="py-3 px-4 text-left font-medium text-slate-700">Schedule</th>
-                      <th className="py-3 px-4 text-left font-medium text-slate-700">Capacity</th>
-                      <th className="py-3 px-4 text-left font-medium text-slate-700">Status</th>
-                      <th className="py-3 px-4 text-right font-medium text-slate-700">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {batches?.filter((batch: Batch) => {
-                      const matchesSearch = batch.name?.toLowerCase().includes(searchTerm.toLowerCase());
-                      const matchesStatus = statusFilter === "all" || 
-                                          (statusFilter === "active" && batch.isActive) ||
-                                          (statusFilter === "inactive" && !batch.isActive);
-                      return matchesSearch && matchesStatus;
-                    }).map((batch: Batch) => {
-                      const course = courses?.find((c: Course) => c.id === batch.courseId);
-                      const teacher = teachers?.find((t: Teacher) => t.id === batch.teacherId);
-                      const batchEnrollments = enrollments?.filter((e: Enrollment) => e.batchId === batch.id) || [];
-                      
-                      return (
-                        <tr key={batch.id} className="border-b hover:bg-slate-50">
-                          <td className="py-3 px-4 font-medium text-slate-900">{batch.name}</td>
-                          <td className="py-3 px-4 text-slate-700">{course?.name || "--"}</td>
-                          <td className="py-3 px-4 text-slate-700">{teacher?.name || "--"}</td>
-                          <td className="py-3 px-4 text-slate-700">{batch.schedule || "--"}</td>
-                          <td className="py-3 px-4 text-slate-700">
-                            {batchEnrollments.length}/{batch.capacity || 30}
-                          </td>
-                          <td className="py-3 px-4">
-                            <Badge
-                              variant={batch.isActive ? "default" : "secondary"}
-                              className="text-xs"
-                            >
-                              {batch.isActive ? "Active" : "Inactive"}
-                            </Badge>
-                          </td>
-                          <td className="py-3 px-4 text-right">
-                            <div className="flex justify-end space-x-1">
-                              <Button variant="ghost" size="sm">
-                                <Eye size={14} />
-                              </Button>
-                              <Button variant="ghost" size="sm">
-                                <Edit size={14} />
-                              </Button>
-                              <Button variant="ghost" size="sm">
-                                <Trash2 size={14} />
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </TabsContent>
-      </Tabs>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 }
