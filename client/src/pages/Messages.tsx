@@ -1,48 +1,28 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { 
-  Mail, 
-  Search, 
-  Filter,
+import {
+  Mail,
+  Search,
   Plus,
   Eye,
   Edit,
   Trash2,
   Send,
-  MessageCircle,
   Clock,
   Check,
   User,
   Users,
   Calendar,
   AlertCircle,
-  GraduationCap
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Textarea } from "@/components/ui/textarea";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { insertMessageSchema } from "@shared/schema";
-import { apiRequest } from "@/lib/queryClient";
-import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Message, Student, Teacher } from "@shared/schema";
-import { z } from "zod";
-
-const messageFormSchema = insertMessageSchema.extend({
-  subject: z.string().min(1, "Subject is required"),
-  content: z.string().min(1, "Content is required"),
-  recipientType: z.enum(["student", "teacher", "parent", "batch", "all"]),
-  recipientId: z.number().optional(),
-  courseId: z.number().optional(),
-  batchId: z.number().optional(),
-});
+import type { Message, Student, Teacher, Course, Batch } from "../../../../types";
+import AddMessageDialog from "@/components/AddMessageDialog";
 
 export default function Messages() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -51,86 +31,50 @@ export default function Messages() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toast } = useToast();
 
-  const { data: messages, isLoading: messagesLoading } = useQuery({
+  const { data: messages, isLoading: messagesLoading } = useQuery<Message[]>({
     queryKey: ["/api/messages"],
+    initialData: [],
   });
-
-  const { data: students } = useQuery({
+  const { data: students } = useQuery<Student[]>({
     queryKey: ["/api/students"],
+    initialData: [],
   });
-
-  const { data: teachers } = useQuery({
+  const { data: teachers } = useQuery<Teacher[]>({
     queryKey: ["/api/teachers"],
+    initialData: [],
   });
-
-  const { data: courses } = useQuery({
+  const { data: courses } = useQuery<Course[]>({
     queryKey: ["/api/courses"],
+    initialData: [],
   });
-
-  const { data: batches } = useQuery({
+  const { data: batches } = useQuery<Batch[]>({
     queryKey: ["/api/batches"],
+    initialData: [],
   });
 
   const { data: parents } = useQuery({
-    queryKey: ["/api/students"],
-    select: (data) => {
-      return data?.filter((student: any) => student.parentName && student.parentPhone)
-        .map((student: any) => ({
+    queryKey: ["/api/students/parents"],
+    queryFn: async () => {
+      const res = await fetch("/api/students");
+      const students: Student[] = await res.json();
+      return students
+        .filter((student) => student.parentName && student.parentPhone)
+        .map((student) => ({
           id: student.id,
           name: student.parentName,
           phone: student.parentPhone,
-          studentName: `${student.firstName} ${student.lastName}`
+          studentName: `${student.firstName} ${student.lastName}`,
         }));
-    }
-  });
-
-  const form = useForm<z.infer<typeof messageFormSchema>>({
-    resolver: zodResolver(messageFormSchema),
-    defaultValues: {
-      subject: "",
-      content: "",
-      type: "announcement",
-      recipientType: "all",
-      recipientId: undefined,
-      courseId: undefined,
-      batchId: undefined,
-      sentBy: "Admin",
     },
-  });
-
-  const createMessageMutation = useMutation({
-    mutationFn: async (data: z.infer<typeof messageFormSchema>) => {
-      const response = await apiRequest("POST", "/api/messages", {
-        ...data,
-        sentAt: new Date(),
-        status: "sent",
-      });
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
-      setIsDialogOpen(false);
-      form.reset();
-      toast({
-        title: "Success",
-        description: "Message sent successfully",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to send message",
-        variant: "destructive",
-      });
-    },
+    initialData: [],
   });
 
   const deleteMessageMutation = useMutation({
     mutationFn: async (id: number) => {
-      await apiRequest("DELETE", `/api/messages/${id}`);
+      await fetch(`/api/messages/${id}`, { method: "DELETE" });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
+      // Optional: add queryClient.invalidateQueries if you use it from context for invalidation
       toast({
         title: "Success",
         description: "Message deleted successfully",
@@ -145,18 +89,8 @@ export default function Messages() {
     },
   });
 
-  const onSubmit = (data: z.infer<typeof messageFormSchema>) => {
-    // If recipient type is batch, use batchId as recipientId
-    if (data.recipientType === "batch" && data.batchId) {
-      data.recipientId = data.batchId;
-    }
-    
-    // Include courseId and batchId in the message data
-    createMessageMutation.mutate(data);
-  };
-
   const filteredMessages = messages?.filter((message: Message) => {
-    const matchesSearch = 
+    const matchesSearch =
       message.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       message.content?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       message.sentBy?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -167,58 +101,44 @@ export default function Messages() {
     return matchesSearch && matchesType && matchesStatus;
   }) || [];
 
-  // Calculate statistics
-  const totalMessages = messages?.length || 0;
-  const sentMessages = messages?.filter((m: Message) => m.status === "sent").length || 0;
-  const draftMessages = messages?.filter((m: Message) => m.status === "draft").length || 0;
-  const announcements = messages?.filter((m: Message) => m.type === "announcement").length || 0;
-  const notifications = messages?.filter((m: Message) => m.type === "notification").length || 0;
-
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "sent": return "text-green-600 bg-green-100";
-      case "draft": return "text-yellow-600 bg-yellow-100";
-      case "failed": return "text-red-600 bg-red-100";
-      default: return "text-gray-600 bg-gray-100";
+      case "sent": return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100";
+      case "draft": return "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100";
+      case "failed": return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100";
+      default: return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100";
     }
   };
 
   const getTypeColor = (type: string) => {
     switch (type) {
-      case "announcement": return "text-blue-600 bg-blue-100";
-      case "notification": return "text-purple-600 bg-purple-100";
-      case "reminder": return "text-orange-600 bg-orange-100";
-      default: return "text-gray-600 bg-gray-100";
+      case "announcement": return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100";
+      case "absent_students": return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-100";
+      case "fees_reminder": return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100";
+      case "results": return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100";
+      default: return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100";
     }
   };
 
   const getRecipientDisplay = (message: Message) => {
-    if (message.recipientType === "all") {
-      return "All Users";
-    } else if (message.recipientType === "student") {
-      if (message.recipientId) {
-        const student = students?.find((s: Student) => s.id === message.recipientId);
-        return student ? `${student.firstName} ${student.lastName}` : "Unknown Student";
-      }
-      return "All Students";
-    } else if (message.recipientType === "teacher") {
-      if (message.recipientId) {
-        const teacher = teachers?.find((t: Teacher) => t.id === message.recipientId);
-        return teacher ? `${teacher.firstName} ${teacher.lastName}` : "Unknown Teacher";
-      }
-      return "All Teachers";
-    } else if (message.recipientType === "parent") {
-      if (message.recipientId) {
-        const student = students?.find((s: Student) => s.id === message.recipientId);
-        return student?.parentName ? `${student.parentName} (Parent of ${student.firstName} ${student.lastName})` : "Unknown Parent";
-      }
-      return "All Parents";
-    } else if (message.recipientType === "batch") {
-      if (message.batchId) {
-        const batch = batches?.find((b: any) => b.id === message.batchId);
-        return batch ? `Batch: ${batch.name}` : "Unknown Batch";
-      }
-      return "All Batches";
+    if (message.recipientType === "all") { return "All Users"; }
+    if (message.recipientType === "student") {
+      return message.recipientId
+        ? students?.find((s: Student) => s.id === message.recipientId)?.firstName + " " +
+        students?.find((s: Student) => s.id === message.recipientId)?.lastName || "Student"
+        : "All Students";
+    }
+    if (message.recipientType === "teacher") {
+      return message.recipientId
+        ? teachers?.find((t: Teacher) => t.id === message.recipientId)?.firstName + " " +
+        teachers?.find((t: Teacher) => t.id === message.recipientId)?.lastName || "Teacher"
+        : "All Teachers";
+    }
+    if (message.recipientType === "parent") {
+      return message.recipientId
+        ? parents?.find((p: any) => p.id === message.recipientId)?.name +
+        ` (Parent of ${parents?.find((p: any) => p.id === message.recipientId)?.studentName})` || "Parent"
+        : "All Parents";
     }
     return "Unknown";
   };
@@ -235,315 +155,72 @@ export default function Messages() {
   }
 
   return (
-    <div className="p-8 space-y-8">
-      <div className="flex items-center justify-between">
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-              <Plus size={16} className="mr-2" />
-              Compose Message
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Compose New Message</DialogTitle>
-            </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField
-                    control={form.control}
-                    name="subject"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Subject</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter subject..." {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="type"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Message Type</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value || ""}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select type" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="attendance">Attendance</SelectItem>
-                            <SelectItem value="fess reminder">Fess Reminder</SelectItem>
-                            <SelectItem value="result">Result</SelectItem>
-                            <SelectItem value="notification">Notification</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="courseId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Course</FormLabel>
-                        <Select 
-                          onValueChange={(value) => {
-                            field.onChange(value && value !== 'all' ? parseInt(value) : undefined);
-                            form.setValue("batchId", undefined);
-                          }} 
-                          value={field.value?.toString()}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select course" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="all">All Courses</SelectItem>
-                            {courses?.map((course: any) => (
-                              <SelectItem key={course.id} value={course.id.toString()}>
-                                {course.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="batchId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Batch</FormLabel>
-                        <Select 
-                          onValueChange={(value) => field.onChange(value && value !== 'all' ? parseInt(value) : undefined)} 
-                          value={field.value?.toString()}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select batch" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="all">All Batches</SelectItem>
-                            {batches
-                              ?.filter((batch: any) => !form.watch("courseId") || batch.courseId === form.watch("courseId"))
-                              .map((batch: any) => (
-                                <SelectItem key={batch.id} value={batch.id.toString()}>
-                                  {batch.name}
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="recipientType"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Send To</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select recipients" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="all">All Users</SelectItem>
-                            <SelectItem value="student">Students</SelectItem>
-                            <SelectItem value="teacher">Teachers</SelectItem>
-                            <SelectItem value="parent">Parents</SelectItem>
-                            <SelectItem value="batch">Batch</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  {form.watch("recipientType") === "student" && (
-                    <FormField
-                      control={form.control}
-                      name="recipientId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Specific Student (Optional)</FormLabel>
-                          <Select onValueChange={(value) => field.onChange(value && value !== 'all' ? parseInt(value) : undefined)} value={field.value?.toString()}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select student or leave empty for all" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="all">All Students</SelectItem>
-                              {students?.map((student: Student) => (
-                                <SelectItem key={student.id} value={student.id.toString()}>
-                                  {student.firstName} {student.lastName}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
-                  {form.watch("recipientType") === "teacher" && (
-                    <FormField
-                      control={form.control}
-                      name="recipientId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Specific Teacher (Optional)</FormLabel>
-                          <Select onValueChange={(value) => field.onChange(value && value !== 'all' ? parseInt(value) : undefined)} value={field.value?.toString()}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select teacher or leave empty for all" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="all">All Teachers</SelectItem>
-                              {teachers?.map((teacher: Teacher) => (
-                                <SelectItem key={teacher.id} value={teacher.id.toString()}>
-                                  {teacher.firstName} {teacher.lastName}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
-                  
-                  {form.watch("recipientType") === "parent" && (
-                    <FormField
-                      control={form.control}
-                      name="recipientId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Specific Parent (Optional)</FormLabel>
-                          <Select onValueChange={(value) => field.onChange(value && value !== 'all' ? parseInt(value) : undefined)} value={field.value?.toString()}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select parent or leave empty for all" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="all">All Parents</SelectItem>
-                              {parents?.map((parent: any) => (
-                                <SelectItem key={parent.id} value={parent.id.toString()}>
-                                  {parent.name} (Parent of {parent.studentName})
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
-                  
-                  {form.watch("recipientType") === "batch" && form.watch("batchId") && (
-                    <FormField
-                      control={form.control}
-                      name="recipientId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Selected Batch</FormLabel>
-                          <div className="p-2 border rounded-md bg-gray-50">
-                            {batches?.find((batch: any) => batch.id === form.watch("batchId"))?.name || "Selected Batch"}
-                          </div>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
-                </div>
-                
-                <FormField
-                  control={form.control}
-                  name="content"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Message Content</FormLabel>
-                      <FormControl>
-                        <Textarea 
-                          placeholder="Type your message here..."
-                          rows={6}
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <div className="flex items-center justify-end space-x-4 pt-6">
-                  <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={createMessageMutation.isPending}>
-                    {createMessageMutation.isPending ? "Sending..." : "Send Message"}
-                  </Button>
-                </div>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
+    <div className="p-6 md:p-8 space-y-6">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Messaging Center</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Communicate with students, teachers, and parents
+          </p>
+        </div>
+        <AddMessageDialog
+          open={isDialogOpen}
+          onOpenChange={setIsDialogOpen}
+          students={students || []}
+          teachers={teachers || []}
+          courses={courses || []}
+          batches={batches || []}
+          parents={parents || []}
+          toast={toast}
+        >
+          <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-md">
+            <Plus size={16} className="mr-2" />
+            New Message
+          </Button>
+        </AddMessageDialog>
       </div>
 
-      {/* Statistics Cards section removed as requested */}
-
       {/* Messages List */}
-      <Card className="glass-card rounded-2xl shadow-lg">
+      <Card className="bg-white dark:bg-gray-800 shadow-md rounded-lg border border-gray-100 dark:border-gray-700">
         <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
-            <CardTitle>All Messages ({filteredMessages.length})</CardTitle>
-            <div className="flex items-center space-x-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white">Message History</CardTitle>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Showing {filteredMessages.length} messages
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row items-stretch gap-2">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={16} />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
                 <Input
                   placeholder="Search messages..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 w-60"
+                  className="pl-10 w-full md:w-64"
                 />
               </div>
               <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="w-full md:w-40">
                   <SelectValue placeholder="Filter by type" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="announcement">Attendance</SelectItem>
-                  <SelectItem value="notification">Fess Reminder</SelectItem>
-                  <SelectItem value="reminder">Reults</SelectItem>
-                  <SelectItem value="alert">Notification</SelectItem>
+                  <SelectItem value="announcement">Announcement</SelectItem>
+                  <SelectItem value="absent_students">Absent Students</SelectItem>
+                  <SelectItem value="fees_reminder">Fees Reminder</SelectItem>
+                  <SelectItem value="results">Results</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="w-full md:w-40">
                   <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="sent">11th (A)</SelectItem>
-                  <SelectItem value="draft">11th (A)</SelectItem>
-                  <SelectItem value="failed">12th </SelectItem>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="sent">Sent</SelectItem>
+                  <SelectItem value="draft">Draft</SelectItem>
+                  <SelectItem value="failed">Failed</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -552,81 +229,117 @@ export default function Messages() {
         <CardContent>
           {filteredMessages.length > 0 ? (
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="text-left py-3 px-4 font-medium text-slate-600 text-sm">Subject</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-600 text-sm">Type</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-600 text-sm">Recipients</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-600 text-sm">Sent By</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-600 text-sm">Date</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-600 text-sm">Status</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-600 text-sm">Actions</th>
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-700">
+                  <tr>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Subject
+                    </th>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Type
+                    </th>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Recipients
+                    </th>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Sent By
+                    </th>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Date
+                    </th>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                   {filteredMessages.map((message: Message) => (
-                    <tr key={message.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="py-4 px-4">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-medium">
+                    <tr
+                      key={message.id}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    >
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white">
                             <Mail size={20} />
                           </div>
-                          <div>
-                            <p className="font-medium text-slate-900">{message.subject}</p>
-                            <p className="text-sm text-slate-500 truncate max-w-xs">{message.content}</p>
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-gray-900 dark:text-white">
+                              {message.subject}
+                            </div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400 truncate max-w-xs">
+                              {message.content}
+                            </div>
                           </div>
                         </div>
                       </td>
-                      <td className="py-4 px-4">
-                        <Badge className={getTypeColor(message.type || "announcement")}>
-                          {message.type || "announcement"}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <Badge className={`${getTypeColor(message.type || "announcement")} px-2 py-1 text-xs font-medium rounded-full`}>
+                          {message.type === "absent_students" ? "Absent Students" :
+                            message.type === "fees_reminder" ? "Fees Reminder" :
+                              message.type === "results" ? "Results" :
+                                "Announcement"}
                         </Badge>
                       </td>
-                      <td className="py-4 px-4">
-                        <div className="flex items-center space-x-1">
-                          {message.recipientType === "all" && <Users size={14} className="text-slate-400" />}
-                          {message.recipientType === "student" && <User size={14} className="text-slate-400" />}
-                          {message.recipientType === "teacher" && <User size={14} className="text-slate-400" />}
-                          {message.recipientType === "parent" && <User size={14} className="text-slate-400" />}
-                          {message.recipientType === "batch" && <GraduationCap size={14} className="text-slate-400" />}
-                          <span className="text-sm text-slate-600">{getRecipientDisplay(message)}</span>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          {message.recipientType === "all" && <Users size={16} className="text-gray-400 mr-2" />}
+                          {message.recipientType === "student" && <User size={16} className="text-gray-400 mr-2" />}
+                          {message.recipientType === "teacher" && <User size={16} className="text-gray-400 mr-2" />}
+                          {message.recipientType === "parent" && <User size={16} className="text-gray-400 mr-2" />}
+                          <span className="text-sm text-gray-900 dark:text-white">
+                            {getRecipientDisplay(message)}
+                          </span>
                         </div>
                       </td>
-                      <td className="py-4 px-4">
-                        <p className="text-sm text-slate-600">{message.sentBy || "Unknown"}</p>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900 dark:text-white">
+                          {message.sentBy || "Unknown"}
+                        </div>
                       </td>
-                      <td className="py-4 px-4">
-                        <div className="flex items-center space-x-1">
-                          <Calendar size={14} className="text-slate-400" />
-                          <span className="text-sm text-slate-600">
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <Calendar size={16} className="text-gray-400 mr-2" />
+                          <span className="text-sm text-gray-500 dark:text-gray-400">
                             {message.sentAt ? new Date(message.sentAt).toLocaleDateString() : "Not sent"}
                           </span>
                         </div>
                       </td>
-                      <td className="py-4 px-4">
-                        <div className="flex items-center space-x-2">
-                          {message.status === "sent" && <Check size={16} className="text-green-600" />}
-                          {message.status === "draft" && <Clock size={16} className="text-yellow-600" />}
-                          {message.status === "failed" && <AlertCircle size={16} className="text-red-600" />}
-                          <Badge className={getStatusColor(message.status || "sent")}>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          {message.status === "sent" && <Check size={16} className="text-emerald-500 mr-2" />}
+                          {message.status === "draft" && <Clock size={16} className="text-amber-500 mr-2" />}
+                          {message.status === "failed" && <AlertCircle size={16} className="text-red-500 mr-2" />}
+                          <Badge className={`${getStatusColor(message.status || "sent")} px-2 py-1 text-xs font-medium rounded-full`}>
                             {message.status || "sent"}
                           </Badge>
                         </div>
                       </td>
-                      <td className="py-4 px-4">
-                        <div className="flex items-center space-x-2">
-                          <Button variant="ghost" size="sm">
+                      <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex items-center justify-end space-x-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                          >
                             <Eye size={14} />
                           </Button>
-                          <Button variant="ghost" size="sm">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                          >
                             <Edit size={14} />
                           </Button>
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             size="sm"
                             onClick={() => deleteMessageMutation.mutate(message.id)}
                             disabled={deleteMessageMutation.isPending}
+                            className="text-gray-500 hover:text-red-600 dark:hover:text-red-400"
                           >
                             <Trash2 size={14} />
                           </Button>
@@ -639,15 +352,20 @@ export default function Messages() {
             </div>
           ) : (
             <div className="text-center py-12">
-              <Mail className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No messages found</h3>
-              <p className="text-gray-500 mb-6">
+              <Mail className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                No messages found
+              </h3>
+              <p className="text-gray-500 dark:text-gray-400 mb-6">
                 {searchTerm ? "Try adjusting your search criteria." : "Get started by composing your first message."}
               </p>
               {!searchTerm && (
-                <Button onClick={() => setIsDialogOpen(true)}>
+                <Button
+                  onClick={() => setIsDialogOpen(true)}
+                  className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                >
                   <Plus size={16} className="mr-2" />
-                  Compose Message
+                  New Message
                 </Button>
               )}
             </div>
